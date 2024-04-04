@@ -4,6 +4,6 @@
 #include <entity.h>
 #include <stars.h>
 
-void drawHud(Entity *entities, int count, Star selectedStar);
+void drawHud(Entity *entities, int count, Star selectedStar, Camera camera);
 
 #endif
