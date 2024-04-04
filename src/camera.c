@@ -2,8 +2,8 @@
 #include <raylib.h>
 #include <raymath.h>
 
-void moveRight(Camera *c, float amount) {
-  float distance = Vector3Distance(c->position, c->target);
+void moveRight(Camera *c, double amount) {
+  double distance = Vector3Distance(c->position, c->target);
   amount *= distance / 5;
 
   Vector3 forward = Vector3Normalize(Vector3Subtract(c->target, c->position));
@@ -13,8 +13,8 @@ void moveRight(Camera *c, float amount) {
   c->target = Vector3Add(c->target, Vector3Scale(right, amount));
 }
 
-void moveUp(Camera *c, float amount) {
-  float distance = Vector3Distance(c->position, c->target);
+void moveUp(Camera *c, double amount) {
+  double distance = Vector3Distance(c->position, c->target);
   amount *= distance / 5;
 
   Vector3 vUp = {0.0f, 1.0f, 0.0f};
@@ -24,7 +24,7 @@ void moveUp(Camera *c, float amount) {
   c->target = Vector3Add(c->target, Vector3Scale(vUp, amount));
 }
 
-void orbitRight(Camera *c, float amount) {
+void orbitRight(Camera *c, double amount) {
   Matrix matRotation = MatrixRotate(c->up, amount);
 
   c->position = Vector3Subtract(c->position, c->target);
@@ -32,11 +32,11 @@ void orbitRight(Camera *c, float amount) {
   c->position = Vector3Add(c->position, c->target);
 }
 
-void orbitUp(Camera *c, float amount) {
+void orbitUp(Camera *c, double amount) {
   Vector3 forward = Vector3Normalize(Vector3Subtract(c->target, c->position));
   Vector3 vRight = Vector3Normalize(Vector3CrossProduct(c->up, forward));
 
-  float angle = acos(Vector3DotProduct(forward, c->up));
+  double angle = acos(Vector3DotProduct(forward, c->up));
 
   if (angle + amount > M_PI) {
     return;
@@ -53,15 +53,15 @@ void orbitUp(Camera *c, float amount) {
   c->position = Vector3Add(c->position, c->target);
 }
 
-void setCameraDistanceFromTarget(Camera *c, float distance) {
+void setCameraDistanceFromTarget(Camera *c, double distance) {
   Vector3 direction = Vector3Normalize(Vector3Subtract(c->target, c->position));
 
   c->position = Vector3Subtract(c->target, Vector3Scale(direction, distance));
 }
 
-void zoomTowardTarget(Camera *c, float amount) {
-  float distance = Vector3Distance(c->position, c->target);
-  float newDistance = distance + amount * distance / 5;
+void zoomTowardTarget(Camera *c, double amount) {
+  double distance = Vector3Distance(c->position, c->target);
+  double newDistance = distance + amount * distance / 5;
 
   if (newDistance < 0.01) {
     newDistance = 0.01;

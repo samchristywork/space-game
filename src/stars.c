@@ -52,7 +52,7 @@ Star *load_stars(int *count) {
 
   char *sql =
       "select proper, dist, x0, y0, z0, tyc from data where cast(dist as "
-      "decimal) < 100 and cast(dist as decimal) > 0.3;";
+      "decimal) < 70 and cast(dist as decimal) > 0.3;";
 
   rc = sqlite3_exec(db, sql, callback, 0, &err_msg);
 
