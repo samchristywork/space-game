@@ -26,6 +26,13 @@ debug: clean build/main
 watch:
 	ls src/*.c | entr make run
 
+.PHONY: flamegraph
+flamegraph: build/main
+	#https://github.com/brendangregg/FlameGraph
+	sudo perf record -F 99 -a -g -- ./build/main
+	sudo perf script | FlameGraph/stackcollapse-perf.pl | FlameGraph/flamegraph.pl > perf.svg
+	firefox perf.svg
+
 .PHONY: clean
 clean:
 	rm -rf build
