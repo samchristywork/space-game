@@ -188,3 +188,122 @@ void drawBillboardStars(Star *stars, int numStars, Camera *camera, Texture2D sta
     }
   }
 }
+
+void drawBattleView(Camera *camera, Entity *entities, int numEntities,
+                    Font font, Star *stars, int numStars, int *selectedStar) {
+  if (IsKeyPressed(KEY_SPACE)) {
+    zoomToSelected(camera, entities, numEntities);
+  }
+
+  static Vector2 selectionStart = {0, 0};
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    selectionStart.x = GetMouseX();
+    selectionStart.y = GetMouseY();
+  }
+
+  int x0 = selectionStart.x;
+  int y0 = selectionStart.y;
+  int dx = GetMouseX() - x0;
+  int dy = GetMouseY() - y0;
+
+  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    if (dx < 0) {
+      x0 = x0 + dx;
+      dx = -dx;
+    }
+    if (dy < 0) {
+      y0 = y0 + dy;
+      dy = -dy;
+    }
+
+    for (int i = 0; i < numEntities; i++) {
+      Entity e = entities[i];
+      Vector3 pos = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+      Vector2 screenPos = GetWorldToScreen(pos, *camera);
+      int x = screenPos.x;
+      int y = screenPos.y;
+      if (x > x0 && x < x0 + dx && y > y0 && y < y0 + dy) {
+        entities[i].selected = true;
+      } else {
+        entities[i].selected = false;
+      }
+    }
+  }
+
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    Vector3 pos = {e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    drawSensorRadius(pos, *camera, e.sensorRadius / 1e5);
+  }
+
+  static bool initialized = false;
+  static Texture2D star;
+  static Texture2D ship;
+
+  if (!initialized) {
+    // TODO: Indicate other things with star color
+    for (int i = 0; i < numStars; i++) {
+      stars[i].temperature = rand() % 100;
+      stars[i].color = tempToColor(stars[i].temperature);
+    }
+
+    star = LoadTexture("assets/star.png");
+    ship = LoadTexture("assets/ship.png");
+
+    initialized = true;
+  }
+
+  drawStars(stars, numStars, camera);
+
+  BeginMode3D(*camera);
+
+  //drawBillboardStars(stars, numStars, camera, star, selectedStar);
+
+  drawGrid();
+
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    drawEclipticCircle(position.x, position.y, position.z, e.sensorRadius / 1e5,
+                       BLUE);
+    if (e.moveOrder) {
+      DrawLine3D(
+          (Vector3){e.target.x / 1e5, e.target.y / 1e5, e.target.z / 1e5},
+          position, RED);
+      drawEclipticCircle(e.target.x / 1e5, e.target.y / 1e5, e.target.z / 1e5,
+                         0.1, RED);
+      drawEclipticCylinder(e.target.x / 1e5, e.target.y / 1e5, e.target.z / 1e5,
+                           0.1, (Color){255, 0, 0, 100});
+    }
+  }
+
+  drawReticle(camera->target.x, camera->target.y, camera->target.z);
+  EndMode3D();
+
+  for (int i = 1; i < 11; i++) {
+    Vector2 screenPos = GetWorldToScreen((Vector3){i, 0.0f, 0.0f}, *camera);
+    char text[100];
+    sprintf(text, "%de5 km", i);
+    DrawText(text, screenPos.x, screenPos.y, 10, BLUE);
+  }
+
+  drawCompassDirections(*camera, font);
+
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    Vector2 screenPos = GetWorldToScreen(position, *camera);
+
+    double distFromCamera = dist3(position, camera->position);
+    double apparentSize = e.radius / (distFromCamera * 37);
+    DrawTexturePro(ship, (Rectangle){0, 0, ship.width, ship.height},
+                   (Rectangle){screenPos.x - apparentSize / 2,
+                               screenPos.y - apparentSize / 2, apparentSize,
+                               apparentSize},
+                   (Vector2){0, 0}, 0, WHITE);
+  }
+
+  if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+    DrawRectangleLines(x0, y0, dx, dy, WHITE);
+  }
+}
