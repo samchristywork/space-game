@@ -134,3 +134,57 @@ void zoomToSelected(Camera *camera, Entity *entities, int numEntities) {
     camera->target.z = averagePosition.z / 1e5;
   }
 }
+
+bool isBehindCamera(Vector3 position, Camera camera) {
+  Vector3 forwards = Vector3Subtract(camera.target, camera.position);
+  Vector3 toPosition = Vector3Subtract(position, camera.position);
+  return Vector3DotProduct(forwards, toPosition) < 0;
+}
+
+void drawStars(Star *stars, int numStars, Camera *camera) {
+  for (int i = 0; i < numStars; i++) {
+    Star s = stars[i];
+    Vector3 position = {s.position.x / 1e5, s.position.y / 1e5, s.position.z / 1e5};
+    if (isBehindCamera(position, *camera)) {
+      continue;
+    }
+    Vector2 screenPos = GetWorldToScreen(position, *camera);
+
+    double x2 = pow(position.x - camera->position.x, 2);
+    double y2 = pow(position.y - camera->position.y, 2);
+    double z2 = pow(position.z - camera->position.z, 2);
+    double distFromCamera = sqrt(x2 + y2 + z2);
+    double radius = 6.96e5;
+    double apparentSize = 10000 * radius / distFromCamera;
+
+    if (apparentSize > 1) {
+      DrawCircle(screenPos.x, screenPos.y, apparentSize, s.color);
+    } else if (apparentSize > 0.7) {
+      DrawPixel(screenPos.x, screenPos.y, s.color);
+      DrawPixel(screenPos.x+1, screenPos.y, s.color);
+      DrawPixel(screenPos.x-1, screenPos.y, s.color);
+      DrawPixel(screenPos.x, screenPos.y+1, s.color);
+      DrawPixel(screenPos.x, screenPos.y-1, s.color);
+    } else {
+      DrawPixel(screenPos.x, screenPos.y, s.color);
+    }
+  }
+}
+
+void drawBillboardStars(Star *stars, int numStars, Camera *camera, Texture2D star, int *selectedStar) {
+  Vector2 mousePos = GetMousePosition();
+  for (int i = 0; i < numStars; i++) {
+    Vector3 position;
+    position.x = stars[i].position.x / 1e5;
+    position.y = stars[i].position.y / 1e5;
+    position.z = stars[i].position.z / 1e5;
+
+    DrawBillboard(*camera, star, position, 10000000.0f, stars[i].color);
+
+    Vector2 screenPos = GetWorldToScreen(stars[i].position, *camera);
+    bool hover = CheckCollisionPointCircle(mousePos, screenPos, 5);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hover) {
+      *selectedStar = i;
+    }
+  }
+}
