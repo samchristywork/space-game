@@ -50,3 +50,39 @@ void drawCompassDirections(Camera camera, Font font) {
     DrawTextEx(font, "-Z", screenPos, 20, 0, GRAY);
   }
 }
+
+void drawGrid() {
+  for (int i = 1; i <= 10; i++) {
+    drawEclipticCircle(0, 0, 0, i, GRAY);
+  }
+
+  for (int i = 0; i < 10; i++) {
+    double x = cos(i * 3.14159 / 5);
+    double y = 0.0f;
+    double z = sin(i * 3.14159 / 5);
+
+    Vector3 source = {x, y, z};
+    Vector3 dest = {x * 10, y * 10, z * 10};
+    DrawLine3D(source, dest, GRAY);
+  }
+
+  for (int i = 0; i < 10; i++) {
+    double x = sin(i * 3.14159 / 5);
+    double y = 0.0f;
+    double z = cos(i * 3.14159 / 5);
+
+    Vector3 source = {x * 5, y * 5, z * 5};
+    Vector3 dest = {x * 10, y * 10, z * 10};
+    DrawLine3D(source, dest, GRAY);
+  }
+}
+
+// Draws visual indicator to show the radius of a sensor for a standard target
+void drawSensorRadius(Vector3 position, Camera camera, double radius) {
+  Vector2 screenPos = GetWorldToScreen(position, camera);
+  double distFromCamera = dist3(position, camera.position);
+  double apparentSize = radius / distFromCamera;
+
+  Color c = {0, 0, 50, 255};
+  DrawCircle(screenPos.x, screenPos.y, apparentSize * 1450, c);
+}
