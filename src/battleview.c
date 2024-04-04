@@ -86,3 +86,51 @@ void drawSensorRadius(Vector3 position, Camera camera, double radius) {
   Color c = {0, 0, 50, 255};
   DrawCircle(screenPos.x, screenPos.y, apparentSize * 1450, c);
 }
+
+Color tempToColor(int temp) {
+  unsigned char r = 0;
+  unsigned char g = 255;
+  unsigned char b = 0;
+
+  if (temp < 50) {
+    b = 255;
+    r = 100 + temp * 5;
+  } else {
+    r = 255;
+    b = 200 + 255 - temp;
+  }
+
+  return (Color){r, g, b, 255};
+}
+
+Vec6 vec6Add(Vec6 a, Vec6 b) {
+  return (Vec6){a.x + b.x, a.y + b.y, a.z + b.z,
+                a.a + b.a, a.b + b.b, a.c + b.c};
+}
+
+Vec6 vec6Scale(Vec6 a, double s) {
+  return (Vec6){a.x * s, a.y * s, a.z * s, a.a * s, a.b * s, a.c * s};
+}
+
+void zoomToSelected(Camera *camera, Entity *entities, int numEntities) {
+  Vec6 averagePosition = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+  int count = 0;
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    if (e.selected) {
+      averagePosition = vec6Add(averagePosition, e.pos);
+      count++;
+    }
+  }
+  if (count != 0) {
+    averagePosition = vec6Scale(averagePosition, 1.0f / count);
+
+    camera->position.x -= camera->target.x - averagePosition.x / 1e5;
+    camera->position.y -= camera->target.y - averagePosition.y / 1e5;
+    camera->position.z -= camera->target.z - averagePosition.z / 1e5;
+
+    camera->target.x = averagePosition.x / 1e5;
+    camera->target.y = averagePosition.y / 1e5;
+    camera->target.z = averagePosition.z / 1e5;
+  }
+}
