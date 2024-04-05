@@ -9,6 +9,62 @@ const char *dimensions[] = {"X", "Y", "Z", "A", "B", "C"};
 int speeds[] = {1, 2, 4, 8, 16, 32};
 int nSpeeds = sizeof(speeds) / sizeof(int);
 
+void drawEntitySelection(Entity *entities, int count) {
+  Rectangle r = (Rectangle){10, GetScreenHeight() - 220, 600, 210};
+  GuiPanel(r, "Entities (TODO)");
+  static int scrollIndex = 0;
+  static int focus = -1;
+  static int active = -1;
+
+  const char *names[count];
+  for (int i = 0; i < count; i++) {
+    names[i] = entities[i].name;
+  }
+
+  GuiListViewEx(
+      (Rectangle){r.x + 10, r.y + 30, r.width / 3 - 20, r.height - 40}, names,
+      count, &scrollIndex, &active, &focus);
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    for (int i = 0; i < count; i++) {
+      entities[i].selected = false;
+    }
+    entities[active].selected = true;
+  }
+
+  r.x += r.width / 3;
+  r.width = r.width / 3;
+
+  for (int i = 0; i < count; i++) {
+    if (entities[i].selected) {
+      GuiLabel((Rectangle){r.x + 10, r.y + 30, r.width / 2 - 20, 20}, "Name");
+      GuiLabel((Rectangle){r.x + 10, r.y + 60, r.width / 2 - 20, 20}, "Mass");
+      GuiLabel((Rectangle){r.x + 10, r.y + 90, r.width / 2 - 20, 20}, "Radius");
+      GuiLabel((Rectangle){r.x + 10, r.y + 120, r.width / 2 - 20, 20},
+               "Sensor Radius");
+      GuiLabel((Rectangle){r.x + 10, r.y + 150, r.width / 2 - 20, 20},
+               "Position");
+      GuiLabel((Rectangle){r.x + 10, r.y + 180, r.width / 2 - 20, 20},
+               "Target");
+
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 30, r.width - 20, 20},
+               entities[i].name);
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 60, r.width - 20, 20},
+               TextFormat("%f", entities[i].mass));
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 90, r.width - 20, 20},
+               TextFormat("%f", entities[i].radius));
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 120, r.width - 20, 20},
+               TextFormat("%f", entities[i].sensorRadius));
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 150, r.width - 20, 20},
+               TextFormat("%f, %f, %f", entities[i].pos.x, entities[i].pos.y,
+                          entities[i].pos.z));
+      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 180, r.width - 20, 20},
+               TextFormat("%f, %f, %f", entities[i].target.x,
+                          entities[i].target.y, entities[i].target.z));
+      return;
+    }
+  }
+}
+
 void drawSpeedControl() {
   int w = 15 + nSpeeds * 40;
   int h = 58;
