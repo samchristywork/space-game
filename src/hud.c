@@ -8,6 +8,7 @@
 const char *dimensions[] = {"X", "Y", "Z", "A", "B", "C"};
 int speeds[] = {1, 2, 4, 8, 16, 32};
 int nSpeeds = sizeof(speeds) / sizeof(int);
+const char *formations[] = {"Random", "Sphere", "Line", "Plane", "Ring"};
 
 void drawEntitySelection(Entity *entities, int count) {
   Rectangle r = (Rectangle){10, GetScreenHeight() - 220, 600, 210};
@@ -119,6 +120,29 @@ void drawDimensionControl() {
   }
 }
 
+void drawFormationControl() {
+  static int formation = 0;
+  int nFormations = sizeof(formations) / sizeof(char *);
+  int w = 125;
+  int h = nFormations * 25 + 20 + 13;
+  Rectangle r =
+      (Rectangle){10, GetScreenHeight() - 220 - h - 10 - 120 - 10, w, h};
+  char t[100];
+  GuiPanel(r, "Formation Control");
+  r.y += 20;
+  for (int i = 0; i < nFormations; i++) {
+    if (i == formation) {
+      guiState = STATE_PRESSED;
+    }
+    if (GuiButton((Rectangle){r.x + 10, r.y + 10 + i * 25, w - 20, 20},
+                  formations[i])) {
+      formation = i;
+    }
+    guiState = STATE_NORMAL;
+  }
+}
+
+void drawHud(Entity *entities, int count, Star selectedStar, Camera camera) {
   bool static initialized = false;
 
   if (!initialized) {
