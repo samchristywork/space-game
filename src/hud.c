@@ -35,33 +35,33 @@ void drawEntitySelection(Entity *entities, int count) {
   r.width = r.width / 3;
 
   for (int i = 0; i < count; i++) {
-    if (entities[i].selected) {
-      GuiLabel((Rectangle){r.x + 10, r.y + 30, r.width / 2 - 20, 20}, "Name");
-      GuiLabel((Rectangle){r.x + 10, r.y + 60, r.width / 2 - 20, 20}, "Mass");
-      GuiLabel((Rectangle){r.x + 10, r.y + 90, r.width / 2 - 20, 20}, "Radius");
-      GuiLabel((Rectangle){r.x + 10, r.y + 120, r.width / 2 - 20, 20},
-               "Sensor Radius");
-      GuiLabel((Rectangle){r.x + 10, r.y + 150, r.width / 2 - 20, 20},
-               "Position");
-      GuiLabel((Rectangle){r.x + 10, r.y + 180, r.width / 2 - 20, 20},
-               "Target");
+    Entity e = entities[i];
 
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 30, r.width - 20, 20},
-               entities[i].name);
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 60, r.width - 20, 20},
-               TextFormat("%f", entities[i].mass));
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 90, r.width - 20, 20},
-               TextFormat("%f", entities[i].radius));
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 120, r.width - 20, 20},
-               TextFormat("%f", entities[i].sensorRadius));
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 150, r.width - 20, 20},
-               TextFormat("%f, %f, %f", entities[i].pos.x, entities[i].pos.y,
-                          entities[i].pos.z));
-      GuiLabel((Rectangle){r.x + r.width / 2 + 10, r.y + 180, r.width - 20, 20},
-               TextFormat("%f, %f, %f", entities[i].target.x,
-                          entities[i].target.y, entities[i].target.z));
-      return;
+    if (!e.selected) {
+      continue;
     }
+
+    int x = r.x + 10;
+    int w = r.width / 2 - 20;
+    GuiLabel((Rectangle){x, r.y + 30, w, 20}, "Name");
+    GuiLabel((Rectangle){x, r.y + 60, w, 20}, "Mass");
+    GuiLabel((Rectangle){x, r.y + 90, w, 20}, "Radius");
+    GuiLabel((Rectangle){x, r.y + 120, w, 20}, "Sensor Radius");
+    GuiLabel((Rectangle){x, r.y + 150, w, 20}, "Position");
+    GuiLabel((Rectangle){x, r.y + 180, w, 20}, "Target");
+
+    x = r.x + r.width / 2 + 10;
+    w = r.width - 20;
+    GuiLabel((Rectangle){x, r.y + 30, w, 20}, e.name);
+    GuiLabel((Rectangle){x, r.y + 60, w, 20}, TextFormat("%f", e.mass));
+    GuiLabel((Rectangle){x, r.y + 90, w, 20}, TextFormat("%f", e.radius));
+    GuiLabel((Rectangle){x, r.y + 120, w, 20},
+             TextFormat("%f", e.sensorRadius));
+    GuiLabel((Rectangle){x, r.y + 150, w, 20},
+             TextFormat("%f, %f, %f", e.pos.x, e.pos.y, e.pos.z));
+    GuiLabel((Rectangle){x, r.y + 180, w, 20},
+             TextFormat("%f, %f, %f", e.target.x, e.target.y, e.target.z));
+    return;
   }
 }
 
@@ -84,6 +84,38 @@ void drawSpeedControl() {
       speed = i;
     }
     guiState = STATE_NORMAL;
+  }
+}
+
+void drawDimensionControl() {
+  static int axes[3] = {0, 1, 2};
+  int maxDimension = 6;
+
+  int w = 40 + maxDimension * 40;
+  Rectangle r = (Rectangle){10, GetScreenHeight() - 220 - 120 - 10, w, 120};
+  char t[100];
+  sprintf(t, "Dimension Control - %s %s %s", dimensions[axes[0]],
+          dimensions[axes[1]], dimensions[axes[2]]);
+  GuiPanel(r, t);
+
+  GuiLabel((Rectangle){r.x + 10, r.y + 30 + 0 * 30, 100, 20}, "X");
+  GuiLabel((Rectangle){r.x + 10, r.y + 30 + 1 * 30, 100, 20}, "Y");
+  GuiLabel((Rectangle){r.x + 10, r.y + 30 + 2 * 30, 100, 20}, "Z");
+
+  for (int axis = 0; axis < 3; axis++) {
+    for (int i = 0; i < maxDimension; i++) {
+      if (axes[axis] == i) {
+        guiState = STATE_PRESSED;
+      }
+
+      if (GuiButton(
+              (Rectangle){r.x + 40 + i * 40, r.y + 30 + axis * 30, 30, 20},
+              dimensions[i])) {
+        axes[axis] = i;
+      }
+
+      guiState = STATE_NORMAL;
+    }
   }
 }
 
