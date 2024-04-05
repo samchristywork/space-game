@@ -199,5 +199,9 @@ void drawHud(Entity *entities, int count, Star selectedStar, Camera camera) {
     GuiSetStyle(LISTVIEW, LIST_ITEMS_SPACING, 2);
   }
 
-  // TODO: Draw the HUD
+  drawEntityNameTags(entities, count, camera);
+  drawEntitySelection(entities, count);
+  drawSpeedControl();
+  drawDimensionControl();
+  drawFormationControl();
 }
