@@ -24,6 +24,18 @@ void moveUp(Camera *c, double amount) {
   c->target = Vector3Add(c->target, Vector3Scale(vUp, amount));
 }
 
+void moveForward(Camera *c, double amount) {
+  double distance = Vector3Distance(c->position, c->target);
+  amount *= distance / 5;
+
+  Vector3 dir = Vector3Subtract(c->target, c->position);
+  dir.y = 0;
+  Vector3 forward = Vector3Normalize(dir);
+
+  c->position = Vector3Add(c->position, Vector3Scale(forward, amount));
+  c->target = Vector3Add(c->target, Vector3Scale(forward, amount));
+}
+
 void orbitRight(Camera *c, double amount) {
   Matrix matRotation = MatrixRotate(c->up, amount);
 
@@ -75,7 +87,11 @@ void handleCamera(Camera *c, int mode) {
 
   if (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
     moveRight(c, mousePositionDelta.x * 0.01);
-    moveUp(c, mousePositionDelta.y * 0.01);
+    if (IsKeyDown(KEY_LEFT_SHIFT)) {
+      moveUp(c, mousePositionDelta.y * 0.01);
+    } else {
+      moveForward(c, mousePositionDelta.y * 0.01);
+    }
   }
 
   if (IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) {
