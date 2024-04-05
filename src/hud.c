@@ -142,6 +142,45 @@ void drawFormationControl() {
   }
 }
 
+double dist3(Vector3 a, Vector3 b);
+
+void drawEntityNameTags(Entity *entities, int count, Camera camera) {
+  for (int i = 0; i < count; i++) {
+    Entity e = entities[i];
+    Vector3 pos = {e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    Vector2 screenPos = GetWorldToScreen(pos, camera);
+    screenPos.x += 10;
+    screenPos.y -= 40;
+    Vector2 textExtents = MeasureTextEx(GetFontDefault(), e.name, 20, 2);
+    if (screenPos.x > 0 && screenPos.x < GetScreenWidth() && screenPos.y > 0 &&
+        screenPos.y < GetScreenHeight()) {
+      Rectangle bounds = {screenPos.x - 2, screenPos.y - 2, textExtents.x + 4,
+                          textExtents.y + 4};
+      DrawLineEx((Vector2){screenPos.x - 10, screenPos.y + 40},
+                 (Vector2){screenPos.x - 2, screenPos.y + 20 + 1}, 1, GRAY);
+      GuiDrawRectangle(bounds, 1, GetColor(GuiGetStyle(DEFAULT, LINE_COLOR)),
+                       GetColor(GuiGetStyle(STATUSBAR, BASE)));
+      DrawText(e.name, screenPos.x, screenPos.y, 20,
+               GetColor(GuiGetStyle(DEFAULT, TEXT + (e.selected ? 1 : 0))));
+    }
+
+    if (e.moveOrder) {
+      Vector2 targetScreenPos = GetWorldToScreen(
+          (Vector3){e.target.x / 1e5, e.target.y / 1e5, e.target.z / 1e5},
+          camera);
+      DrawCircle(targetScreenPos.x, targetScreenPos.y, 5, RED);
+      double dist = dist3((Vector3){e.pos.x, e.pos.y, e.pos.z},
+                          (Vector3){e.target.x, e.target.y, e.target.z});
+      char distStr[100];
+      int numPlaces = (int)log10(dist);
+      sprintf(distStr, "%0.3fe%d km", dist / pow(10, numPlaces), numPlaces);
+      DrawText(distStr, screenPos.x, screenPos.y + 25, 10, RED);
+
+      DrawText("Fuel consumption", screenPos.x, screenPos.y + 35, 10, RED);
+    }
+  }
+}
+
 void drawHud(Entity *entities, int count, Star selectedStar, Camera camera) {
   bool static initialized = false;
 
