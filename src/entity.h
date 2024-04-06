@@ -10,23 +10,32 @@ enum Faction {
 };
 
 typedef struct Vec6 {
+  long long x;
+  long long y;
+  long long z;
+  long long a;
+  long long b;
+  long long c;
+} Vec6;
+
+typedef struct Vec6f {
   double x;
   double y;
   double z;
   double a;
   double b;
   double c;
-} Vec6;
+} Vec6f;
 
 typedef struct Entity {
-  const char *name;
+  char *name;
   double mass;         // kg
-  double radius;       // km
-  Vec6 pos;            // km
-  Vec6 vel;            // km/s
-  Vec6 acc;            // km/s^2
-  Vec6 target;         // km
-  double sensorRadius; // km
+  long long radius;    // m
+  Vec6 pos;            // m
+  Vec6f vel;           // m/s
+  Vec6f acc;           // m/s^2
+  Vec6 target;         // m
+  double sensorRadius; // m
   bool moveOrder;
   bool selected;
   int faction;
