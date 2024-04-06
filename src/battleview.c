@@ -1,9 +1,12 @@
 #include <entity.h>
+#include <game.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <stars.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+extern Game game;
 
 double dist2(Vector2 a, Vector2 b) {
   return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2));
@@ -143,6 +146,13 @@ bool isBehindCamera(Vector3 position, Camera camera) {
 }
 
 void drawStars(Star *stars, int numStars, Camera *camera) {
+  static bool initialized = false;
+  static Texture2D star;
+  if (!initialized) {
+    star = LoadTexture("assets/star_flare.png");
+    initialized = true;
+  }
+
   for (int i = 0; i < numStars; i++) {
     Star s = stars[i];
     Vector3 position = {s.position.x / 1e5, s.position.y / 1e5,
@@ -156,11 +166,15 @@ void drawStars(Star *stars, int numStars, Camera *camera) {
     double y2 = pow(position.y - camera->position.y, 2);
     double z2 = pow(position.z - camera->position.z, 2);
     double distFromCamera = sqrt(x2 + y2 + z2);
-    double radius = 6.96e5;
-    double apparentSize = 10000 * radius / distFromCamera;
+    double radius = 6.96e5 * 1000;
+    double apparentSize = 50000 * radius / distFromCamera;
 
     if (apparentSize > 1) {
-      DrawCircle(screenPos.x, screenPos.y, apparentSize, s.color);
+      DrawTexturePro(star, (Rectangle){0, 0, star.width, star.height},
+                     (Rectangle){screenPos.x - apparentSize / 2,
+                                 screenPos.y - apparentSize / 2, apparentSize,
+                                 apparentSize},
+                     (Vector2){0, 0}, 0, s.color);
     } else if (apparentSize > 0.7) {
       DrawPixel(screenPos.x, screenPos.y, s.color);
       DrawPixel(screenPos.x + 1, screenPos.y, s.color);
@@ -196,12 +210,13 @@ void drawMarkers(Camera camera) {
   for (int i = 1; i < 11; i++) {
     Vector2 screenPos = GetWorldToScreen((Vector3){i, 0.0f, 0.0f}, camera);
     char text[100];
-    sprintf(text, "%de5 km", i);
+    sprintf(text, "%de5 m", i);
     DrawText(text, screenPos.x, screenPos.y, 10, BLUE);
   }
 }
 
-void drawEntitySymbols(Camera *camera, Entity *entities, int numEntities, Texture2D ship) {
+void drawEntitySymbols(Camera *camera, Entity *entities, int numEntities,
+                       Texture2D ship) {
   for (int i = 0; i < numEntities; i++) {
     Entity e = entities[i];
     Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
