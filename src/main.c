@@ -5,6 +5,7 @@
 #include <levels.h>
 #include <raylib.h>
 #include <raymath.h>
+#include <simulate.h>
 #include <stars.h>
 
 Entity *entities;
@@ -61,11 +62,14 @@ int main() {
 
     if (IsKeyPressed(KEY_A) && IsKeyDown(KEY_LEFT_CONTROL)) {
       for (int i = 0; i < nEntities; i++) {
-        entities[i].selected = true;
+        Entity *e = &entities[i];
+        e->selected = true;
       }
     }
 
     ClearBackground((Color){0, 0, 0, 255});
+
+    simulate(&camera, entities, nEntities);
 
     static int selectedStar = 0;
     drawBattleView(&camera, entities, nEntities, font, stars, numStars,
