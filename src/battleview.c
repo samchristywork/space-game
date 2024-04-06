@@ -232,6 +232,21 @@ void drawEntitySymbols(Camera *camera, Entity *entities, int numEntities,
   }
 }
 
+void drawVectors(Entity *entities, int numEntities) {
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    Vector3 velocity = (Vector3){e.vel.x, e.vel.y, e.vel.z};
+    Vector3 acceleration = (Vector3){e.acc.x, e.acc.y, e.acc.z};
+
+    velocity = Vector3Normalize(velocity);
+    acceleration = Vector3Normalize(acceleration);
+
+    DrawLine3D(position, Vector3Add(position, velocity), GREEN);
+    DrawLine3D(position, Vector3Add(position, acceleration), RED);
+  }
+}
+
 void drawBattleView(Camera *camera, Entity *entities, int numEntities,
                     Font font, Star *stars, int numStars, int *selectedStar) {
   if (IsKeyPressed(KEY_SPACE)) {
@@ -300,7 +315,6 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
 
   BeginMode3D(*camera);
 
-
   drawGrid();
 
   for (int i = 0; i < numEntities; i++) {
@@ -320,6 +334,10 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
   }
 
   drawReticle(camera->target.x, camera->target.y, camera->target.z);
+
+  if (IsKeyDown(KEY_LEFT_CONTROL)) {
+    drawVectors(entities, numEntities);
+  }
 
   EndMode3D();
 
