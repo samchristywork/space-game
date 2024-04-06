@@ -24,9 +24,9 @@ int callback(void *NotUsed, int argc, char **argv, char **azColName) {
 
   stars[numStars].position =
       (Vector3){atof(argv[2]), atof(argv[3]), atof(argv[4])};
-  stars[numStars].position.x *= PARSECS_TO_KM;
-  stars[numStars].position.y *= PARSECS_TO_KM;
-  stars[numStars].position.z *= PARSECS_TO_KM;
+  stars[numStars].position.x *= PARSECS_TO_KM * 1000;
+  stars[numStars].position.y *= PARSECS_TO_KM * 1000;
+  stars[numStars].position.z *= PARSECS_TO_KM * 1000;
 
   stars[numStars].name = malloc(strlen(argv[0]) + 1);
   strcpy(stars[numStars].name, argv[0]);
