@@ -1,3 +1,4 @@
+#include <game.h>
 #include <hud.h>
 
 #define RAYGUI_IMPLEMENTATION
@@ -5,13 +6,15 @@
 
 #include "../raygui/styles/cherry/style_cherry.h"
 
+extern Game game;
+
 const char *dimensions[] = {"X", "Y", "Z", "A", "B", "C"};
-int speeds[] = {1, 2, 4, 8, 16, 32};
+int speeds[] = {0, 1, 2, 3, 4, 5, 6, 7};
 int nSpeeds = sizeof(speeds) / sizeof(int);
 const char *formations[] = {"Random", "Sphere", "Line", "Plane", "Ring"};
 
 void drawEntitySelection(Entity *entities, int count) {
-  Rectangle r = (Rectangle){10, GetScreenHeight() - 220, 600, 210};
+  Rectangle r = (Rectangle){10, GetScreenHeight() - 210, 600, 200};
   GuiPanel(r, "Entities (TODO)");
   static int scrollIndex = 0;
   static int focus = -1;
@@ -22,9 +25,10 @@ void drawEntitySelection(Entity *entities, int count) {
     names[i] = entities[i].name;
   }
 
-  GuiListViewEx(
-      (Rectangle){r.x + 10, r.y + 30, r.width / 3 - 20, r.height - 40}, names,
-      count, &scrollIndex, &active, &focus);
+  r.width = r.width / 3 - 20;
+
+  GuiListViewEx((Rectangle){r.x + 10, r.y + 30, r.width, r.height - 40}, names,
+                count, &scrollIndex, &active, &focus);
   if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
     for (int i = 0; i < count; i++) {
       entities[i].selected = false;
@@ -32,8 +36,8 @@ void drawEntitySelection(Entity *entities, int count) {
     entities[active].selected = true;
   }
 
-  r.x += r.width / 3;
-  r.width = r.width / 3;
+  r.x += r.width + 20;
+  r.y += 10;
 
   for (int i = 0; i < count; i++) {
     Entity e = entities[i];
@@ -43,25 +47,39 @@ void drawEntitySelection(Entity *entities, int count) {
     }
 
     int x = r.x + 10;
-    int w = r.width / 2 - 20;
-    GuiLabel((Rectangle){x, r.y + 30, w, 20}, "Name");
-    GuiLabel((Rectangle){x, r.y + 60, w, 20}, "Mass");
-    GuiLabel((Rectangle){x, r.y + 90, w, 20}, "Radius");
-    GuiLabel((Rectangle){x, r.y + 120, w, 20}, "Sensor Radius");
-    GuiLabel((Rectangle){x, r.y + 150, w, 20}, "Position");
-    GuiLabel((Rectangle){x, r.y + 180, w, 20}, "Target");
+    int w = r.width;
+    int stride = 20;
+    GuiLabel((Rectangle){x, r.y + 1 * stride, w, 20}, "Name");
+    GuiLabel((Rectangle){x, r.y + 2 * stride, w, 20}, "Mass (kg)");
+    GuiLabel((Rectangle){x, r.y + 3 * stride, w, 20}, "Radius (m)");
+    GuiLabel((Rectangle){x, r.y + 4 * stride, w, 20}, "Sensor Radius (m)");
+    GuiLabel((Rectangle){x, r.y + 5 * stride, w, 20}, "Position (m)");
+    GuiLabel((Rectangle){x, r.y + 6 * stride, w, 20}, "Velocity (m/s)");
+    GuiLabel((Rectangle){x, r.y + 7 * stride, w, 20}, "Acceleration (m/s²)");
+    GuiLabel((Rectangle){x, r.y + 8 * stride, w, 20}, "Target (m)");
 
-    x = r.x + r.width / 2 + 10;
-    w = r.width - 20;
-    GuiLabel((Rectangle){x, r.y + 30, w, 20}, e.name);
-    GuiLabel((Rectangle){x, r.y + 60, w, 20}, TextFormat("%f", e.mass));
-    GuiLabel((Rectangle){x, r.y + 90, w, 20}, TextFormat("%f", e.radius));
-    GuiLabel((Rectangle){x, r.y + 120, w, 20},
-             TextFormat("%f", e.sensorRadius));
-    GuiLabel((Rectangle){x, r.y + 150, w, 20},
-             TextFormat("%f, %f, %f", e.pos.x, e.pos.y, e.pos.z));
-    GuiLabel((Rectangle){x, r.y + 180, w, 20},
-             TextFormat("%f, %f, %f", e.target.x, e.target.y, e.target.z));
+    // TODO: Monospace
+    x += r.width + 10;
+    GuiLabel((Rectangle){x, r.y + 1 * stride, w, 20}, e.name);
+    GuiLabel((Rectangle){x, r.y + 2 * stride, w, 20}, TextFormat("%f", e.mass));
+    GuiLabel((Rectangle){x, r.y + 3 * stride, w, 20},
+             TextFormat("%f", e.radius));
+    GuiLabel((Rectangle){x, r.y + 4 * stride, w, 20},
+             TextFormat("%d", e.sensorRadius));
+    GuiLabel((Rectangle){x, r.y + 5 * stride, w, 20},
+             TextFormat("%d, %d, %d", e.pos.x, e.pos.y, e.pos.z));
+    GuiLabel((Rectangle){x, r.y + 6 * stride, w, 20},
+             TextFormat("(%0.2f) %0.2f, %0.2f, %0.2f",
+                        sqrt(e.vel.x * e.vel.x + e.vel.y * e.vel.y +
+                             e.vel.z * e.vel.z),
+                        e.vel.x, e.vel.y, e.vel.z));
+    GuiLabel((Rectangle){x, r.y + 7 * stride, w, 20},
+             TextFormat("(%0.2f) %0.2f, %0.2f, %0.2f",
+                        sqrt(e.acc.x * e.acc.x + e.acc.y * e.acc.y +
+                             e.acc.z * e.acc.z),
+                        e.acc.x, e.acc.y, e.acc.z));
+    GuiLabel((Rectangle){x, r.y + 8 * stride, w, 20},
+             TextFormat("%d, %d, %d", e.target.x, e.target.y, e.target.z));
     return;
   }
 }
