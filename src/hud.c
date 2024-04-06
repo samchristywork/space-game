@@ -120,11 +120,11 @@ void drawDimensionControl() {
   }
 }
 
-void drawFormationControl() {
+void drawFormationControl(Camera camera, Entity *entities, int count) {
   static int formation = 0;
   int nFormations = sizeof(formations) / sizeof(char *);
   int w = 125;
-  int h = nFormations * 25 + 20 + 13;
+  int h = (nFormations + 2) * 25 + 20 + 13;
   Rectangle r =
       (Rectangle){10, GetScreenHeight() - 220 - h - 10 - 120 - 10, w, h};
   char t[100];
@@ -139,6 +139,38 @@ void drawFormationControl() {
       formation = i;
     }
     guiState = STATE_NORMAL;
+  }
+
+  static float spacing = 1e5;
+  GuiSlider((Rectangle){r.x + 10, r.y + 10 + nFormations * 25, w - 20, 20},
+            "Spacing", TextFormat("%0.3e", spacing), &spacing, 1e5, 1e6);
+
+  bool apply = false;
+  if (GuiButton(
+          (Rectangle){r.x + 10, r.y + 10 + (nFormations + 1) * 25, w - 20, 20},
+          "Apply") ||
+      IsKeyPressed(KEY_ENTER)) {
+    apply = true;
+  }
+
+  int nSelected = 0;
+  for (int i = 0; i < count; i++) {
+    if (entities[i].selected) {
+      nSelected++;
+    }
+  }
+
+  if (strcmp(formations[formation], "Line") == 0) {
+    int idx = 0;
+    for (int i = 0; i < count; i++) {
+      if (entities[i].selected) {
+        idx++;
+        Vec6 target = {0, 0, 0, 0, 0, 0};
+        target.x = idx * spacing - nSelected * spacing / 2;
+        entities[i].target = target;
+        entities[i].moveOrder = true;
+      }
+    }
   }
 }
 
