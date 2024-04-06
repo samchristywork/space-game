@@ -13,7 +13,8 @@ double dist3(Vector3 a, Vector3 b) {
   return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2) + pow(a.z - b.z, 2));
 }
 
-void drawEclipticCircle(double x, double y, double z, double radius, Color color) {
+void drawEclipticCircle(double x, double y, double z, double radius,
+                        Color color) {
   DrawCircle3D((Vector3){x, y, z}, radius, (Vector3){1, 0, 0}, 90, color);
 }
 
@@ -144,7 +145,8 @@ bool isBehindCamera(Vector3 position, Camera camera) {
 void drawStars(Star *stars, int numStars, Camera *camera) {
   for (int i = 0; i < numStars; i++) {
     Star s = stars[i];
-    Vector3 position = {s.position.x / 1e5, s.position.y / 1e5, s.position.z / 1e5};
+    Vector3 position = {s.position.x / 1e5, s.position.y / 1e5,
+                        s.position.z / 1e5};
     if (isBehindCamera(position, *camera)) {
       continue;
     }
@@ -161,17 +163,18 @@ void drawStars(Star *stars, int numStars, Camera *camera) {
       DrawCircle(screenPos.x, screenPos.y, apparentSize, s.color);
     } else if (apparentSize > 0.7) {
       DrawPixel(screenPos.x, screenPos.y, s.color);
-      DrawPixel(screenPos.x+1, screenPos.y, s.color);
-      DrawPixel(screenPos.x-1, screenPos.y, s.color);
-      DrawPixel(screenPos.x, screenPos.y+1, s.color);
-      DrawPixel(screenPos.x, screenPos.y-1, s.color);
+      DrawPixel(screenPos.x + 1, screenPos.y, s.color);
+      DrawPixel(screenPos.x - 1, screenPos.y, s.color);
+      DrawPixel(screenPos.x, screenPos.y + 1, s.color);
+      DrawPixel(screenPos.x, screenPos.y - 1, s.color);
     } else {
       DrawPixel(screenPos.x, screenPos.y, s.color);
     }
   }
 }
 
-void drawBillboardStars(Star *stars, int numStars, Camera *camera, Texture2D star, int *selectedStar) {
+void drawBillboardStars(Star *stars, int numStars, Camera *camera,
+                        Texture2D star, int *selectedStar) {
   Vector2 mousePos = GetMousePosition();
   for (int i = 0; i < numStars; i++) {
     Vector3 position;
@@ -186,6 +189,31 @@ void drawBillboardStars(Star *stars, int numStars, Camera *camera, Texture2D sta
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hover) {
       *selectedStar = i;
     }
+  }
+}
+
+void drawMarkers(Camera camera) {
+  for (int i = 1; i < 11; i++) {
+    Vector2 screenPos = GetWorldToScreen((Vector3){i, 0.0f, 0.0f}, camera);
+    char text[100];
+    sprintf(text, "%de5 km", i);
+    DrawText(text, screenPos.x, screenPos.y, 10, BLUE);
+  }
+}
+
+void drawEntitySymbols(Camera *camera, Entity *entities, int numEntities, Texture2D ship) {
+  for (int i = 0; i < numEntities; i++) {
+    Entity e = entities[i];
+    Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
+    Vector2 screenPos = GetWorldToScreen(position, *camera);
+
+    double distFromCamera = dist3(position, camera->position);
+    double apparentSize = e.radius / (distFromCamera * 37);
+    DrawTexturePro(ship, (Rectangle){0, 0, ship.width, ship.height},
+                   (Rectangle){screenPos.x - apparentSize / 2,
+                               screenPos.y - apparentSize / 2, apparentSize,
+                               apparentSize},
+                   (Vector2){0, 0}, 0, WHITE);
   }
 }
 
@@ -257,7 +285,6 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
 
   BeginMode3D(*camera);
 
-  //drawBillboardStars(stars, numStars, camera, star, selectedStar);
 
   drawGrid();
 
@@ -278,30 +305,14 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
   }
 
   drawReticle(camera->target.x, camera->target.y, camera->target.z);
+
   EndMode3D();
 
-  for (int i = 1; i < 11; i++) {
-    Vector2 screenPos = GetWorldToScreen((Vector3){i, 0.0f, 0.0f}, *camera);
-    char text[100];
-    sprintf(text, "%de5 km", i);
-    DrawText(text, screenPos.x, screenPos.y, 10, BLUE);
-  }
+  drawMarkers(*camera);
 
   drawCompassDirections(*camera, font);
 
-  for (int i = 0; i < numEntities; i++) {
-    Entity e = entities[i];
-    Vector3 position = (Vector3){e.pos.x / 1e5, e.pos.y / 1e5, e.pos.z / 1e5};
-    Vector2 screenPos = GetWorldToScreen(position, *camera);
-
-    double distFromCamera = dist3(position, camera->position);
-    double apparentSize = e.radius / (distFromCamera * 37);
-    DrawTexturePro(ship, (Rectangle){0, 0, ship.width, ship.height},
-                   (Rectangle){screenPos.x - apparentSize / 2,
-                               screenPos.y - apparentSize / 2, apparentSize,
-                               apparentSize},
-                   (Vector2){0, 0}, 0, WHITE);
-  }
+  drawEntitySymbols(camera, entities, numEntities, ship);
 
   if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
     DrawRectangleLines(x0, y0, dx, dy, WHITE);
