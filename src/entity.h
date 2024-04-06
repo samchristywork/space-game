@@ -32,4 +32,7 @@ typedef struct Entity {
   int faction;
 } Entity;
 
+Entity *addEntity(Entity *entities[], int *nEntities, char *name, Vec6 pos,
+                  double mass, double radius, double sensorRadius);
+
 #endif
