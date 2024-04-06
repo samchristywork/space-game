@@ -1,12 +1,16 @@
 #include <battleview.h>
 #include <camera.h>
 #include <entity.h>
+#include <game.h>
 #include <hud.h>
 #include <levels.h>
 #include <raylib.h>
 #include <raymath.h>
 #include <simulate.h>
 #include <stars.h>
+#include <stdlib.h>
+
+Game game;
 
 Entity *entities;
 int nEntities = 0;
@@ -14,6 +18,8 @@ int nEntities = 0;
 int main() {
   int numStars = 0;
   Star *stars = load_stars(&numStars);
+
+  game.speed = 1;
 
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(1920, 1080, "TODO");
@@ -35,6 +41,8 @@ int main() {
   int opacity = 0;
   int opacityTarget = 255;
   int fadeRate = 40;
+
+  game.elapsedTime = 0;
 
   level(0, &entities, &nEntities);
 
@@ -69,7 +77,7 @@ int main() {
 
     ClearBackground((Color){0, 0, 0, 255});
 
-    simulate(&camera, entities, nEntities);
+    simulate(&camera, entities, nEntities, game.speed * GetFrameTime());
 
     static int selectedStar = 0;
     drawBattleView(&camera, entities, nEntities, font, stars, numStars,

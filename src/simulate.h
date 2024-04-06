@@ -4,6 +4,6 @@
 #include <entity.h>
 #include <raylib.h>
 
-void simulate(Camera *camera, Entity *entities, int count);
+void simulate(Camera *camera, Entity *entities, int count, double dt);
 
 #endif
