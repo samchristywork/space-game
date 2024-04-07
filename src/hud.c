@@ -131,12 +131,10 @@ void drawSpeedControl(Rectangle r) {
   free(time);
 }
 
-void drawDimensionControl() {
+void drawDimensionControl(Rectangle r) {
   static int axes[3] = {0, 1, 2};
-  int maxDimension = 6;
+  int maxDimension = sizeof(dimensions) / sizeof(char *);
 
-  int w = 40 + maxDimension * 40;
-  Rectangle r = (Rectangle){10, GetScreenHeight() - 210 - 120 - 10, w, 120};
   char t[100];
   sprintf(t, "Dimension Control - %s %s %s", dimensions[axes[0]],
           dimensions[axes[1]], dimensions[axes[2]]);
@@ -275,10 +273,12 @@ void drawHud(Entity *entities, int count, Star selectedStar, Camera camera) {
   }
 
   int sw = GetScreenWidth();
+  int sh = GetScreenHeight();
+  int maxDimension = sizeof(dimensions) / sizeof(char *);
 
   drawEntityNameTags(entities, count, camera);
   drawEntitySelection(entities, count);
   drawSpeedControl((Rectangle){sw - 650, 10, 640, 58});
-  drawDimensionControl();
-  drawFormationControl();
+  drawDimensionControl(
+      (Rectangle){10, sh - 210 - 120 - 10, 40 + maxDimension * 40, 120});
 }
