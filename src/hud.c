@@ -201,7 +201,32 @@ void drawFormationControl(Camera camera, Entity *entities, int count) {
     }
   }
 
-  if (strcmp(formations[formation], "Line") == 0) {
+  if (strcmp(formations[formation], "Ring") == 0) {
+    int idx = 0;
+    for (int i = 0; i < count; i++) {
+      if (entities[i].selected) {
+        idx++;
+        Vec6 target = {0, 0, 0, 0, 0, 0};
+        target.x = cos(2 * PI * idx / nSelected) * spacing;
+        target.z = sin(2 * PI * idx / nSelected) * spacing;
+        target.x += camera.target.x * 1e5;
+        target.y += camera.target.y * 1e5;
+        target.z += camera.target.z * 1e5;
+        Vector2 screenPos = GetWorldToScreen((Vector3){entities[i].pos.x / 1e5,
+                                                       entities[i].pos.y / 1e5,
+                                                       entities[i].pos.z / 1e5},
+                                             camera);
+        Vector2 targetScreenPos = GetWorldToScreen(
+            (Vector3){target.x / 1e5, target.y / 1e5, target.z / 1e5}, camera);
+        DrawLineEx(screenPos, targetScreenPos, 1, RED);
+
+        if (apply) {
+          entities[i].target = target;
+          entities[i].moveOrder = true;
+        }
+      }
+    }
+  } else if (strcmp(formations[formation], "Line") == 0) {
     int idx = 0;
     for (int i = 0; i < count; i++) {
       if (entities[i].selected) {
