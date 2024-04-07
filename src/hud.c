@@ -96,31 +96,28 @@ char *printTime(double time) {
   int seconds = time;
 
   char *t = malloc(100);
-  sprintf(t, "%dy%dd%dh%dm%ds", years, days, hours, minutes, seconds);
+  sprintf(t, "%dy%03dd%02dh%02dm%02ds", years, days, hours, minutes, seconds);
   return t;
 }
 
-void drawSpeedControl() {
-  int buttonWidth = 55;
-  int w = 15 + nSpeeds * buttonWidth;
-  int h = 58;
+void drawSpeedControl(Rectangle r) {
   static int speedIdx = 0;
-  Rectangle r = (Rectangle){GetScreenWidth() - w - 10, 10, w, h};
   char t[100];
   sprintf(t, "Speed Control - 10e%dx", speeds[speedIdx]);
   GuiPanel(r, t);
-  r.y += 20;
+
   for (int i = 0; i < nSpeeds; i++) {
     if (i == speedIdx) {
       guiState = STATE_PRESSED;
     }
+
     char s[10];
     sprintf(s, "10e%dx", speeds[i]);
-    if (GuiButton((Rectangle){r.x + 10 + i * buttonWidth, r.y + 10,
-                              buttonWidth - 5, 20},
-                  s)) {
+    int buttonWidth = (r.width - (nSpeeds + 1) * 10) / nSpeeds;
+    Rectangle buttonRect = {r.x + 10 + i * (buttonWidth + 10), r.y + 30,
+                            buttonWidth, 20};
+    if (GuiButton(buttonRect, s)) {
       speedIdx = i;
-      game.speed = speeds[speedIdx];
     }
     guiState = STATE_NORMAL;
   }
@@ -128,8 +125,9 @@ void drawSpeedControl() {
   game.speed = pow(10, speeds[speedIdx]);
 
   char *time = printTime(game.elapsedTime);
-  GuiDrawText(time, (Rectangle){r.x + 12, r.y - 14, w - 20, 20},
-              TEXT_ALIGN_RIGHT, GetColor(GuiGetStyle(LABEL, TEXT + 0)));
+  Rectangle timeRect = {r.x + 10, r.y + 8, r.width - 20, 20};
+  GuiDrawText(time, timeRect, TEXT_ALIGN_RIGHT,
+              GetColor(GuiGetStyle(LABEL, TEXT + 0)));
   free(time);
 }
 
@@ -138,7 +136,7 @@ void drawDimensionControl() {
   int maxDimension = 6;
 
   int w = 40 + maxDimension * 40;
-  Rectangle r = (Rectangle){10, GetScreenHeight() - 220 - 120 - 10, w, 120};
+  Rectangle r = (Rectangle){10, GetScreenHeight() - 210 - 120 - 10, w, 120};
   char t[100];
   sprintf(t, "Dimension Control - %s %s %s", dimensions[axes[0]],
           dimensions[axes[1]], dimensions[axes[2]]);
@@ -171,7 +169,7 @@ void drawFormationControl(Camera camera, Entity *entities, int count) {
   int w = 125;
   int h = (nFormations + 2) * 25 + 20 + 13;
   Rectangle r =
-      (Rectangle){10, GetScreenHeight() - 220 - h - 10 - 120 - 10, w, h};
+      (Rectangle){10, GetScreenHeight() - 210 - h - 10 - 120 - 10, w, h};
   char t[100];
   GuiPanel(r, "Formation Control");
   r.y += 20;
@@ -276,9 +274,11 @@ void drawHud(Entity *entities, int count, Star selectedStar, Camera camera) {
     GuiSetStyle(LISTVIEW, LIST_ITEMS_SPACING, 2);
   }
 
+  int sw = GetScreenWidth();
+
   drawEntityNameTags(entities, count, camera);
   drawEntitySelection(entities, count);
-  drawSpeedControl();
+  drawSpeedControl((Rectangle){sw - 650, 10, 640, 58});
   drawDimensionControl();
   drawFormationControl();
 }
