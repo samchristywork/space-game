@@ -348,6 +348,7 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
   drawEntitySymbols(camera, entities, numEntities, ship);
 
   if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-    DrawRectangleLines(x0, y0, dx, dy, WHITE);
+    DrawRectangle(x0, y0, dx, dy, (Color){0, 0, 255, 100});
+    DrawRectangleLines(x0, y0, dx, dy, BLUE);
   }
 }
