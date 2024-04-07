@@ -84,6 +84,22 @@ void drawEntitySelection(Entity *entities, int count) {
   }
 }
 
+char *printTime(double time) {
+  int years = time / 31536000;
+  time -= years * 31536000;
+  int days = time / 86400;
+  time -= days * 86400;
+  int hours = time / 3600;
+  time -= hours * 3600;
+  int minutes = time / 60;
+  time -= minutes * 60;
+  int seconds = time;
+
+  char *t = malloc(100);
+  sprintf(t, "%dy%dd%dh%dm%ds", years, days, hours, minutes, seconds);
+  return t;
+}
+
 void drawSpeedControl() {
   int buttonWidth = 55;
   int w = 15 + nSpeeds * buttonWidth;
@@ -110,6 +126,11 @@ void drawSpeedControl() {
   }
 
   game.speed = pow(10, speeds[speedIdx]);
+
+  char *time = printTime(game.elapsedTime);
+  GuiDrawText(time, (Rectangle){r.x + 12, r.y - 14, w - 20, 20},
+              TEXT_ALIGN_RIGHT, GetColor(GuiGetStyle(LABEL, TEXT + 0)));
+  free(time);
 }
 
 void drawDimensionControl() {
