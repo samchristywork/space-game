@@ -9,7 +9,7 @@
 extern Game game;
 
 const char *dimensions[] = {"X", "Y", "Z", "A", "B", "C"};
-int speeds[] = {0, 1, 2, 3, 4, 5, 6, 7};
+int speeds[] = {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7};
 int nSpeeds = sizeof(speeds) / sizeof(int);
 const char *formations[] = {"Random", "Sphere", "Line", "Plane", "Ring"};
 
@@ -85,25 +85,31 @@ void drawEntitySelection(Entity *entities, int count) {
 }
 
 void drawSpeedControl() {
-  int w = 15 + nSpeeds * 40;
+  int buttonWidth = 55;
+  int w = 15 + nSpeeds * buttonWidth;
   int h = 58;
-  static int speed = 0;
+  static int speedIdx = 0;
   Rectangle r = (Rectangle){GetScreenWidth() - w - 10, 10, w, h};
   char t[100];
-  sprintf(t, "Speed Control - %dx", speeds[speed]);
+  sprintf(t, "Speed Control - 10e%dx", speeds[speedIdx]);
   GuiPanel(r, t);
   r.y += 20;
   for (int i = 0; i < nSpeeds; i++) {
-    if (i == speed) {
+    if (i == speedIdx) {
       guiState = STATE_PRESSED;
     }
     char s[10];
-    sprintf(s, "%dx", speeds[i]);
-    if (GuiButton((Rectangle){r.x + 10 + i * 40, r.y + 10, 35, 20}, s)) {
-      speed = i;
+    sprintf(s, "10e%dx", speeds[i]);
+    if (GuiButton((Rectangle){r.x + 10 + i * buttonWidth, r.y + 10,
+                              buttonWidth - 5, 20},
+                  s)) {
+      speedIdx = i;
+      game.speed = speeds[speedIdx];
     }
     guiState = STATE_NORMAL;
   }
+
+  game.speed = pow(10, speeds[speedIdx]);
 }
 
 void drawDimensionControl() {
