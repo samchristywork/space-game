@@ -15,6 +15,23 @@ Game game;
 Entity *entities;
 int nEntities = 0;
 
+void drawFuzziness() {
+  static float fuzziness = 1.0f;
+  if (fuzziness > 0) {
+    for (int i = 0; i < GetScreenWidth(); i += 10) {
+      for (int j = 0; j < GetScreenHeight(); j += 10) {
+        if (rand() % 100 < 100 * fuzziness) {
+          DrawRectangle(i, j, 10, 10, (Color){0, 0, 0, 255});
+          char s[2] = "X";
+          s[0] = rand() % 26 + 'A';
+          DrawText(s, i, j, 15, (Color){rand() % 255, 0, 0, 100});
+        }
+      }
+    }
+    fuzziness -= 0.05;
+  }
+}
+
 int main() {
   int numStars = 0;
   Star *stars = load_stars(&numStars);
@@ -82,20 +99,7 @@ int main() {
     drawBattleView(&camera, entities, nEntities, stars, numStars,
                    &selectedStar);
 
-    static float fuzziness = 1.0f;
-    if (fuzziness > 0) {
-      for (int i = 0; i < GetScreenWidth(); i += 10) {
-        for (int j = 0; j < GetScreenHeight(); j += 10) {
-          if (rand() % 100 < 100 * fuzziness) {
-            DrawRectangle(i, j, 10, 10, (Color){0, 0, 0, 255});
-            char s[2] = "X";
-            s[0] = rand() % 26 + 'A';
-            DrawText(s, i, j, 15, (Color){rand() % 255, 0, 0, 100});
-          }
-        }
-      }
-      fuzziness -= 0.05;
-    }
+    drawFuzziness();
 
     drawHud(entities, nEntities, stars[selectedStar], camera);
 
