@@ -19,14 +19,15 @@ int main() {
   int numStars = 0;
   Star *stars = load_stars(&numStars);
 
-  game.speed = 1;
-
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(1920, 1080, "TODO");
   SetTargetFPS(60);
   SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE | FLAG_FULLSCREEN_MODE);
 
-  Font font = LoadFont("./assets/fonts/LiterationMonoNerdFont-Regular.ttf");
+  game.speed = 1;
+  game.elapsedTime = 0;
+  game.font_primary = LoadFont("./assets/fonts/LiterationMonoNerdFont-Regular.ttf");
+  game.font_secondary = LoadFont("./assets/fonts/VT323-Regular.ttf");
 
   Camera camera = {0};
   camera.position = (Vector3){10.0f, 10.0f, 10.0f};
@@ -41,8 +42,6 @@ int main() {
   int opacity = 0;
   int opacityTarget = 255;
   int fadeRate = 40;
-
-  game.elapsedTime = 0;
 
   level(0, &entities, &nEntities);
 
@@ -80,7 +79,7 @@ int main() {
     simulate(&camera, entities, nEntities, game.speed * GetFrameTime());
 
     static int selectedStar = 0;
-    drawBattleView(&camera, entities, nEntities, font, stars, numStars,
+    drawBattleView(&camera, entities, nEntities, stars, numStars,
                    &selectedStar);
 
     static float fuzziness = 1.0f;

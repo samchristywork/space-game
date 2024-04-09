@@ -6,6 +6,6 @@
 #include <stars.h>
 
 void drawBattleView(Camera *camera, Entity *entities, int numEntities,
-                    Font font, Star *stars, int numStars, int *selectedStar);
+                    Star *stars, int numStars, int *selectedStar);
 
 #endif

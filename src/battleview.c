@@ -36,22 +36,24 @@ void drawReticle(double x, double y, double z) {
   DrawLine3D(source, dest, GRAY);
 }
 
-void drawCompassDirections(Camera camera, Font font) {
+void drawCompassDirections(Camera camera) {
+  Font font = game.font_primary;
+
   {
     Vector2 screenPos = GetWorldToScreen((Vector3){11.0f, 0.0f, 0.0f}, camera);
-    DrawTextEx(font, "+X", screenPos, 20, 0, GRAY);
+    DrawTextEx(font, "+X", screenPos, 24, 0, GRAY);
   }
   {
     Vector2 screenPos = GetWorldToScreen((Vector3){-11.0f, 0.0f, 0.0f}, camera);
-    DrawTextEx(font, "-X", screenPos, 20, 0, GRAY);
+    DrawTextEx(font, "-X", screenPos, 24, 0, GRAY);
   }
   {
     Vector2 screenPos = GetWorldToScreen((Vector3){0.0f, 0.0f, 11.0f}, camera);
-    DrawTextEx(font, "+Z", screenPos, 20, 0, GRAY);
+    DrawTextEx(font, "+Z", screenPos, 24, 0, GRAY);
   }
   {
     Vector2 screenPos = GetWorldToScreen((Vector3){0.0f, 0.0f, -11.0f}, camera);
-    DrawTextEx(font, "-Z", screenPos, 20, 0, GRAY);
+    DrawTextEx(font, "-Z", screenPos, 24, 0, GRAY);
   }
 }
 
@@ -248,7 +250,7 @@ void drawVectors(Entity *entities, int numEntities) {
 }
 
 void drawBattleView(Camera *camera, Entity *entities, int numEntities,
-                    Font font, Star *stars, int numStars, int *selectedStar) {
+                    Star *stars, int numStars, int *selectedStar) {
   if (IsKeyPressed(KEY_SPACE)) {
     zoomToSelected(camera, entities, numEntities);
   }
@@ -343,7 +345,7 @@ void drawBattleView(Camera *camera, Entity *entities, int numEntities,
 
   drawMarkers(*camera);
 
-  drawCompassDirections(*camera, font);
+  drawCompassDirections(*camera);
 
   drawEntitySymbols(camera, entities, numEntities, ship);
 

@@ -29,7 +29,6 @@ void simulate(Camera *camera, Entity *entities, int count, double dt) {
 
       float dot = Vector3DotProduct(heading, desired);
       Vector3 along = Vector3Scale(Vector3Normalize(desired), dot);
-
       Vector3 corrective = Vector3Normalize(Vector3Subtract(along, heading));
 
       Vector3 acc;
