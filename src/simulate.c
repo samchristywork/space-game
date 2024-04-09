@@ -38,9 +38,20 @@ void simulate(Camera *camera, Entity *entities, int count, double dt) {
         acc = Vector3Add(Vector3Scale(desired, 10), corrective);
       }
 
-      double maxAcc = 9.81; // 1g
+      float distanceToTarget = Vector3Length(Vector3Subtract(target, position));
+      float speed = Vector3Length(velocity);
+      double acceleration = 9.81; // 1g
 
-      acc = Vector3Scale(Vector3Normalize(acc), maxAcc);
+      float timeToStop = speed / acceleration;
+      float distanceToStop =
+          speed * timeToStop - 0.5 * acceleration * timeToStop * timeToStop;
+
+      if (distanceToStop < distanceToTarget) {
+        acc = Vector3Scale(Vector3Normalize(acc), acceleration);
+      } else {
+        Vector3 antiVel = Vector3Scale(Vector3Normalize(velocity), -1);
+        acc = Vector3Scale(Vector3Normalize(antiVel), 10);
+      }
 
       e->acc.x = acc.x;
       e->acc.y = acc.y;
