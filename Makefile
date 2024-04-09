@@ -15,7 +15,7 @@ build/main: objects
 	${CC} build/*.o ${LIBS} -o $@
 
 .PHONY: run
-run: clean build/main
+run: build/main
 	export LD_LIBRARY_PATH=raylib/lib/; ./build/main
 
 .PHONY: debug
