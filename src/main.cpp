@@ -2,12 +2,16 @@
 #include <GLFW/glfw3.h>
 #include <cstdio>
 #include <cstdlib>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 static const char *vert_src = R"(
 #version 330 core
-layout(location = 0) in vec2 pos;
+layout(location = 0) in vec3 pos;
+uniform mat4 mvp;
 void main() {
-    gl_Position = vec4(pos, 0.0, 1.0);
+    gl_Position = mvp * vec4(pos, 1.0);
 }
 )";
 
@@ -58,6 +62,54 @@ static GLuint build_program() {
   return prog;
 }
 
+// Orbit camera state
+struct Camera {
+  float yaw = 0.0f;   // radians, rotation around Y axis
+  float pitch = 0.3f; // radians, elevation
+  float dist = 3.0f;  // distance from target
+  glm::vec3 target{0.0f, 0.0f, 0.0f};
+
+  glm::mat4 view() const {
+    float x = dist * cosf(pitch) * sinf(yaw);
+    float y = dist * sinf(pitch);
+    float z = dist * cosf(pitch) * cosf(yaw);
+    glm::vec3 eye = target + glm::vec3(x, y, z);
+    return glm::lookAt(eye, target, glm::vec3(0, 1, 0));
+  }
+};
+
+static Camera cam;
+static bool mmb_down = false;
+static double last_mx = 0.0;
+static double last_my = 0.0;
+
+static void mouse_button_cb(GLFWwindow *, int button, int action, int) {
+  if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+    mmb_down = (action == GLFW_PRESS);
+  }
+}
+
+static void cursor_pos_cb(GLFWwindow *, double mx, double my) {
+  double dx = mx - last_mx;
+  double dy = my - last_my;
+  last_mx = mx;
+  last_my = my;
+
+  if (!mmb_down)
+    return;
+
+  const float sensitivity = 0.005f;
+  cam.yaw -= (float)dx * sensitivity;
+  cam.pitch += (float)dy * sensitivity;
+
+  // Clamp pitch to avoid gimbal flip
+  const float limit = glm::radians(89.0f);
+  if (cam.pitch > limit)
+    cam.pitch = limit;
+  if (cam.pitch < -limit)
+    cam.pitch = -limit;
+}
+
 int main() {
   if (!glfwInit()) {
     fprintf(stderr, "Failed to init GLFW\n");
@@ -77,6 +129,11 @@ int main() {
 
   glfwMakeContextCurrent(win);
   glfwSwapInterval(1);
+  glfwSetMouseButtonCallback(win, mouse_button_cb);
+  glfwSetCursorPosCallback(win, cursor_pos_cb);
+
+  // Seed last mouse position to avoid a jump on first move
+  glfwGetCursorPos(win, &last_mx, &last_my);
 
   glewExperimental = GL_TRUE;
   if (glewInit() != GLEW_OK) {
@@ -85,9 +142,10 @@ int main() {
   }
 
   GLuint prog = build_program();
+  GLint mvp_loc = glGetUniformLocation(prog, "mvp");
 
   float verts[] = {
-      0.0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f,
+      0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f,
   };
 
   GLuint vao, vbo;
@@ -97,17 +155,28 @@ int main() {
   glBindVertexArray(vao);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
   glEnableVertexAttribArray(0);
+
+  glEnable(GL_DEPTH_TEST);
 
   while (!glfwWindowShouldClose(win)) {
     if (glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_PRESS)
       glfwSetWindowShouldClose(win, GLFW_TRUE);
 
+    int w, h;
+    glfwGetFramebufferSize(win, &w, &h);
+    glViewport(0, 0, w, h);
+
     glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glm::mat4 proj =
+        glm::perspective(glm::radians(45.0f), (float)w / h, 0.1f, 1000.0f);
+    glm::mat4 mvp = proj * cam.view();
 
     glUseProgram(prog);
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
