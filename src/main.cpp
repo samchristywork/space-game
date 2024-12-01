@@ -84,12 +84,11 @@ static double last_mx = 0.0;
 static double last_my = 0.0;
 
 static void mouse_button_cb(GLFWwindow *, int button, int action, int) {
-  if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+  if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
-  }
 }
 
-static void cursor_pos_cb(GLFWwindow *, double mx, double my) {
+static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
   double dx = mx - last_mx;
   double dy = my - last_my;
   last_mx = mx;
@@ -98,16 +97,33 @@ static void cursor_pos_cb(GLFWwindow *, double mx, double my) {
   if (!mmb_down)
     return;
 
-  const float sensitivity = 0.005f;
-  cam.yaw -= (float)dx * sensitivity;
-  cam.pitch += (float)dy * sensitivity;
+  bool shift = glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+               glfwGetKey(win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
 
-  // Clamp pitch to avoid gimbal flip
-  const float limit = glm::radians(89.0f);
-  if (cam.pitch > limit)
-    cam.pitch = limit;
-  if (cam.pitch < -limit)
-    cam.pitch = -limit;
+  if (shift) {
+    // Pan: move target in camera-local right/up plane
+    float x = cosf(cam.pitch) * sinf(cam.yaw);
+    float y = sinf(cam.pitch);
+    float z = cosf(cam.pitch) * cosf(cam.yaw);
+    glm::vec3 fwd = glm::normalize(glm::vec3(x, y, z));
+    glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+    glm::vec3 up = glm::cross(right, fwd);
+
+    float pan_speed = cam.dist * 0.001f;
+    cam.target -= right * (float)dx * pan_speed;
+    cam.target += up * (float)dy * pan_speed;
+  } else {
+    // Orbit
+    const float sensitivity = 0.005f;
+    cam.yaw -= (float)dx * sensitivity;
+    cam.pitch += (float)dy * sensitivity;
+
+    const float limit = glm::radians(89.0f);
+    if (cam.pitch > limit)
+      cam.pitch = limit;
+    if (cam.pitch < -limit)
+      cam.pitch = -limit;
+  }
 }
 
 int main() {
