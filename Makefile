@@ -6,7 +6,7 @@ INCS := $(shell pkg-config --cflags gl glfw3 glew) $(shell pkg-config --cflags g
 SRC := src/main.cpp
 BIN := build/main
 
-.PHONY: all clean
+.PHONY: all clean run
 
 all: $(BIN)
 
@@ -15,6 +15,9 @@ $(BIN): $(SRC) | build
 
 build:
 	mkdir -p build
+
+run: $(BIN)
+	./$(BIN)
 
 clean:
 	rm -rf build
