@@ -110,7 +110,7 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
     glm::vec3 up = glm::cross(right, fwd);
 
     float pan_speed = cam.dist * 0.001f;
-    cam.target -= right * (float)dx * pan_speed;
+    cam.target += right * (float)dx * pan_speed;
     cam.target += up * (float)dy * pan_speed;
   } else {
     // Orbit
