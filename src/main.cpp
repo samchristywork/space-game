@@ -9,17 +9,23 @@
 static const char *vert_src = R"(
 #version 330 core
 layout(location = 0) in vec3 pos;
+layout(location = 1) in vec3 v_color;
 uniform mat4 mvp;
+out vec3 frag_color;
 void main() {
     gl_Position = mvp * vec4(pos, 1.0);
+    frag_color = v_color;
 }
 )";
 
 static const char *frag_src = R"(
 #version 330 core
+in vec3 frag_color;
+uniform vec3 u_color;
+uniform bool u_use_vertex_color;
 out vec4 color;
 void main() {
-    color = vec4(1.0, 1.0, 1.0, 1.0);
+    color = vec4(u_use_vertex_color ? frag_color : u_color, 1.0);
 }
 )";
 
@@ -159,7 +165,10 @@ int main() {
 
   GLuint prog = build_program();
   GLint mvp_loc = glGetUniformLocation(prog, "mvp");
+  GLint color_loc = glGetUniformLocation(prog, "u_color");
+  GLint use_vc_loc = glGetUniformLocation(prog, "u_use_vertex_color");
 
+  // Triangle
   float verts[] = {
       0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f,
   };
@@ -173,6 +182,32 @@ int main() {
   glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
   glEnableVertexAttribArray(0);
+
+  // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
+  // Interleaved: pos(3) + color(3)
+  float axis_verts[] = {
+      -0.1f, 0.0f,  0.0f,  1.0f, 0.2f, 0.2f, // X- red
+      0.1f,  0.0f,  0.0f,  1.0f, 0.2f, 0.2f, // X+ red
+      0.0f,  -0.1f, 0.0f,  0.2f, 1.0f, 0.2f, // Y- green
+      0.0f,  0.1f,  0.0f,  0.2f, 1.0f, 0.2f, // Y+ green
+      0.0f,  0.0f,  -0.1f, 0.2f, 0.4f, 1.0f, // Z- blue
+      0.0f,  0.0f,  0.1f,  0.2f, 0.4f, 1.0f, // Z+ blue
+  };
+
+  GLuint axis_vao, axis_vbo;
+  glGenVertexArrays(1, &axis_vao);
+  glGenBuffers(1, &axis_vbo);
+
+  glBindVertexArray(axis_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, axis_vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(axis_verts), axis_verts, GL_STATIC_DRAW);
+  // pos
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  // color (location 1)
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
   glEnable(GL_DEPTH_TEST);
 
@@ -192,9 +227,21 @@ int main() {
     glm::mat4 mvp = proj * cam.view();
 
     glUseProgram(prog);
+
+    // Draw triangle
+    glUniform1i(use_vc_loc, 0);
+    glUniform3f(color_loc, 1.0f, 1.0f, 1.0f);
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    // Draw orbit target indicator
+    glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target);
+    glUniform1i(use_vc_loc, 1);
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(axis_mvp));
+    glBindVertexArray(axis_vao);
+    glLineWidth(2.0f);
+    glDrawArrays(GL_LINES, 0, 6);
 
     glfwSwapBuffers(win);
     glfwPollEvents();
@@ -202,6 +249,8 @@ int main() {
 
   glDeleteVertexArrays(1, &vao);
   glDeleteBuffers(1, &vbo);
+  glDeleteVertexArrays(1, &axis_vao);
+  glDeleteBuffers(1, &axis_vbo);
   glDeleteProgram(prog);
   glfwTerminate();
   return 0;
