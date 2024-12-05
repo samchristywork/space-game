@@ -89,6 +89,11 @@ static bool mmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 
+static void scroll_cb(GLFWwindow *, double, double dy) {
+  cam.dist *= powf(0.9f, (float)dy);
+  if (cam.dist < 0.01f) cam.dist = 0.01f;
+}
+
 static void mouse_button_cb(GLFWwindow *, int button, int action, int) {
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
@@ -153,6 +158,7 @@ int main() {
   glfwSwapInterval(1);
   glfwSetMouseButtonCallback(win, mouse_button_cb);
   glfwSetCursorPosCallback(win, cursor_pos_cb);
+  glfwSetScrollCallback(win, scroll_cb);
 
   // Seed last mouse position to avoid a jump on first move
   glfwGetCursorPos(win, &last_mx, &last_my);
