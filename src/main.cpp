@@ -1,19 +1,23 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
 
 static const char *vert_src = R"(
 #version 330 core
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 v_color;
 uniform mat4 mvp;
+uniform float u_point_size;
 out vec3 frag_color;
 void main() {
     gl_Position = mvp * vec4(pos, 1.0);
+    gl_PointSize = u_point_size;
     frag_color = v_color;
 }
 )";
@@ -91,7 +95,8 @@ static double last_my = 0.0;
 
 static void scroll_cb(GLFWwindow *, double, double dy) {
   cam.dist *= powf(0.9f, (float)dy);
-  if (cam.dist < 0.01f) cam.dist = 0.01f;
+  if (cam.dist < 0.01f)
+    cam.dist = 0.01f;
 }
 
 static void mouse_button_cb(GLFWwindow *, int button, int action, int) {
@@ -173,6 +178,7 @@ int main() {
   GLint mvp_loc = glGetUniformLocation(prog, "mvp");
   GLint color_loc = glGetUniformLocation(prog, "u_color");
   GLint use_vc_loc = glGetUniformLocation(prog, "u_use_vertex_color");
+  GLint point_size_loc = glGetUniformLocation(prog, "u_point_size");
 
   // Triangle
   float verts[] = {
@@ -215,7 +221,46 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Stars: random points on a unit sphere, rendered with rotation-only view
+  // so they appear infinitely distant regardless of camera position.
+  static constexpr int NUM_STARS = 3000;
+  std::vector<float> star_verts;
+  star_verts.reserve(NUM_STARS * 6);
+  srand(42);
+  for (int i = 0; i < NUM_STARS; i++) {
+    // Uniform distribution on sphere via normal-vector method
+    float x = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+    float y = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+    float z = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+    float len = sqrtf(x * x + y * y + z * z);
+    if (len < 1e-6f) {
+      i--;
+      continue;
+    }
+    x /= len;
+    y /= len;
+    z /= len;
+
+    // Vary brightness: most stars dim, a few bright
+    float b = 0.3f + 0.7f * powf(rand() / (float)RAND_MAX, 3.0f);
+    star_verts.insert(star_verts.end(), {x, y, z, b, b, b});
+  }
+
+  GLuint star_vao, star_vbo;
+  glGenVertexArrays(1, &star_vao);
+  glGenBuffers(1, &star_vbo);
+  glBindVertexArray(star_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, star_vbo);
+  glBufferData(GL_ARRAY_BUFFER, star_verts.size() * sizeof(float),
+               star_verts.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   glEnable(GL_DEPTH_TEST);
+  glEnable(GL_PROGRAM_POINT_SIZE);
 
   while (!glfwWindowShouldClose(win)) {
     if (glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -225,14 +270,27 @@ int main() {
     glfwGetFramebufferSize(win, &w, &h);
     glViewport(0, 0, w, h);
 
-    glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glm::mat4 proj =
         glm::perspective(glm::radians(45.0f), (float)w / h, 0.1f, 1000.0f);
-    glm::mat4 mvp = proj * cam.view();
+    glm::mat4 view = cam.view();
+    glm::mat4 mvp = proj * view;
+
+    // Rotation-only view for stars (strip translation so they're at infinity)
+    glm::mat4 view_rot = glm::mat4(glm::mat3(view));
 
     glUseProgram(prog);
+    glUniform1f(point_size_loc, 1.0f);
+
+    // Draw stars (depth writes off so they're always behind everything)
+    glDepthMask(GL_FALSE);
+    glUniform1i(use_vc_loc, 1);
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(proj * view_rot));
+    glBindVertexArray(star_vao);
+    glDrawArrays(GL_POINTS, 0, NUM_STARS);
+    glDepthMask(GL_TRUE);
 
     // Draw triangle
     glUniform1i(use_vc_loc, 0);
@@ -257,6 +315,8 @@ int main() {
   glDeleteBuffers(1, &vbo);
   glDeleteVertexArrays(1, &axis_vao);
   glDeleteBuffers(1, &axis_vbo);
+  glDeleteVertexArrays(1, &star_vao);
+  glDeleteBuffers(1, &star_vbo);
   glDeleteProgram(prog);
   glfwTerminate();
   return 0;
