@@ -25,11 +25,20 @@ void main() {
 static const char *frag_src = R"(
 #version 330 core
 in vec3 frag_color;
-uniform vec3 u_color;
-uniform bool u_use_vertex_color;
+uniform vec3  u_color;
+uniform bool  u_use_vertex_color;
+uniform bool  u_is_star;
+uniform float u_glow_falloff;
 out vec4 color;
 void main() {
-    color = vec4(u_use_vertex_color ? frag_color : u_color, 1.0);
+    vec3 c = u_use_vertex_color ? frag_color : u_color;
+    if (u_is_star) {
+        float d = length(gl_PointCoord - 0.5) * 2.0; // 0=centre, 1=edge
+        float a = exp(-d * u_glow_falloff);
+        color = vec4(c * a, a);
+    } else {
+        color = vec4(c, 1.0);
+    }
 }
 )";
 
@@ -179,21 +188,22 @@ int main() {
   GLint color_loc = glGetUniformLocation(prog, "u_color");
   GLint use_vc_loc = glGetUniformLocation(prog, "u_use_vertex_color");
   GLint point_size_loc = glGetUniformLocation(prog, "u_point_size");
+  GLint is_star_loc = glGetUniformLocation(prog, "u_is_star");
+  GLint falloff_loc = glGetUniformLocation(prog, "u_glow_falloff");
 
-  // Triangle
-  float verts[] = {
-      0.0f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f,
-  };
-
-  GLuint vao, vbo;
-  glGenVertexArrays(1, &vao);
-  glGenBuffers(1, &vbo);
-
-  glBindVertexArray(vao);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+  // Star: a single point at the origin (pos + color, no color used directly)
+  float sun_vert[] = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
+  GLuint sun_vao, sun_vbo;
+  glGenVertexArrays(1, &sun_vao);
+  glGenBuffers(1, &sun_vbo);
+  glBindVertexArray(sun_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, sun_vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(sun_vert), sun_vert, GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
   // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
   // Interleaved: pos(3) + color(3)
@@ -292,12 +302,36 @@ int main() {
     glDrawArrays(GL_POINTS, 0, NUM_STARS);
     glDepthMask(GL_TRUE);
 
-    // Draw triangle
+    // Draw star: three additive glow layers (outer → inner)
     glUniform1i(use_vc_loc, 0);
-    glUniform3f(color_loc, 1.0f, 1.0f, 1.0f);
+    glUniform1i(is_star_loc, 1);
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
-    glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(sun_vao);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive
+    glDepthMask(GL_FALSE);
+
+    // Outer halo – large, orange-tinted, soft
+    glUniform1f(point_size_loc, 180.0f);
+    glUniform1f(falloff_loc, 3.0f);
+    glUniform3f(color_loc, 1.0f, 0.5f, 0.1f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    // Mid glow – medium, warm yellow
+    glUniform1f(point_size_loc, 80.0f);
+    glUniform1f(falloff_loc, 5.0f);
+    glUniform3f(color_loc, 1.0f, 0.85f, 0.4f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    // Core – small, white-hot
+    glUniform1f(point_size_loc, 20.0f);
+    glUniform1f(falloff_loc, 8.0f);
+    glUniform3f(color_loc, 1.0f, 1.0f, 0.9f);
+    glDrawArrays(GL_POINTS, 0, 1);
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+    glUniform1i(is_star_loc, 0);
 
     // Draw orbit target indicator
     glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target);
@@ -311,8 +345,8 @@ int main() {
     glfwPollEvents();
   }
 
-  glDeleteVertexArrays(1, &vao);
-  glDeleteBuffers(1, &vbo);
+  glDeleteVertexArrays(1, &sun_vao);
+  glDeleteBuffers(1, &sun_vbo);
   glDeleteVertexArrays(1, &axis_vao);
   glDeleteBuffers(1, &axis_vbo);
   glDeleteVertexArrays(1, &star_vao);
