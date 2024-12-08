@@ -81,6 +81,29 @@ static GLuint build_program() {
   return prog;
 }
 
+// Local stars scattered around the scene.
+// Colors approximate stellar spectral types (O=blue → M=red).
+struct LocalStar {
+  glm::vec3 pos;
+  glm::vec3 color; // base tint; glow layers are derived from this
+};
+
+static const LocalStar LOCAL_STARS[] = {
+    // Our sun (G-type, yellow) at origin
+    {{0.0f, 0.0f, 0.0f}, {1.0f, 0.90f, 0.60f}},
+    // Neighbours – varied spectral types and distances
+    {{4.0f, 1.5f, -3.0f}, {0.6f, 0.75f, 1.00f}},   // B – blue-white
+    {{-5.0f, 0.5f, 2.0f}, {1.0f, 0.40f, 0.15f}},   // M – red dwarf
+    {{3.0f, -2.0f, 5.0f}, {1.0f, 0.95f, 0.85f}},   // A – white
+    {{-2.5f, 3.0f, -6.0f}, {1.0f, 0.70f, 0.35f}},  // K – orange
+    {{7.0f, 0.0f, 1.0f}, {0.55f, 0.65f, 1.00f}},   // O – hot blue
+    {{-6.0f, -1.0f, -4.0f}, {1.0f, 0.95f, 0.75f}}, // F – yellow-white
+    {{1.0f, 5.0f, 4.0f}, {1.0f, 0.50f, 0.20f}},    // K – orange giant
+    {{-3.0f, -3.5f, 6.0f}, {0.70f, 0.80f, 1.00f}}, // B – blue
+    {{5.5f, 2.0f, -5.0f}, {1.0f, 0.35f, 0.10f}},   // M – red
+    {{-7.0f, 1.5f, 3.0f}, {1.0f, 1.00f, 0.90f}},   // A – white
+};
+
 // Orbit camera state
 struct Camera {
   float yaw = 0.0f;   // radians, rotation around Y axis
