@@ -325,32 +325,35 @@ int main() {
     glDrawArrays(GL_POINTS, 0, NUM_STARS);
     glDepthMask(GL_TRUE);
 
-    // Draw star: three additive glow layers (outer → inner)
+    // Draw local stars: three additive glow layers per star (outer → inner)
     glUniform1i(use_vc_loc, 0);
     glUniform1i(is_star_loc, 1);
-    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
     glBindVertexArray(sun_vao);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE); // additive
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glDepthMask(GL_FALSE);
 
-    // Outer halo – large, orange-tinted, soft
-    glUniform1f(point_size_loc, 180.0f);
-    glUniform1f(falloff_loc, 3.0f);
-    glUniform3f(color_loc, 1.0f, 0.5f, 0.1f);
-    glDrawArrays(GL_POINTS, 0, 1);
+    for (const auto &s : LOCAL_STARS) {
+      glm::mat4 star_mvp = mvp * glm::translate(glm::mat4(1.0f), s.pos);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(star_mvp));
 
-    // Mid glow – medium, warm yellow
-    glUniform1f(point_size_loc, 80.0f);
-    glUniform1f(falloff_loc, 5.0f);
-    glUniform3f(color_loc, 1.0f, 0.85f, 0.4f);
-    glDrawArrays(GL_POINTS, 0, 1);
-
-    // Core – small, white-hot
-    glUniform1f(point_size_loc, 20.0f);
-    glUniform1f(falloff_loc, 8.0f);
-    glUniform3f(color_loc, 1.0f, 1.0f, 0.9f);
-    glDrawArrays(GL_POINTS, 0, 1);
+      glm::vec3 c = s.color;
+      // Outer halo – tinted, soft
+      glUniform1f(point_size_loc, 180.0f);
+      glUniform1f(falloff_loc, 3.0f);
+      glUniform3f(color_loc, c.r * 0.8f, c.g * 0.4f, c.b * 0.1f);
+      glDrawArrays(GL_POINTS, 0, 1);
+      // Mid glow
+      glUniform1f(point_size_loc, 80.0f);
+      glUniform1f(falloff_loc, 5.0f);
+      glUniform3f(color_loc, c.r, c.g * 0.9f, c.b * 0.5f);
+      glDrawArrays(GL_POINTS, 0, 1);
+      // Core – white-hot
+      glUniform1f(point_size_loc, 20.0f);
+      glUniform1f(falloff_loc, 8.0f);
+      glUniform3f(color_loc, c.r, c.g, c.b * 0.95f);
+      glDrawArrays(GL_POINTS, 0, 1);
+    }
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
