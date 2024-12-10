@@ -125,6 +125,25 @@ static bool mmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 
+static void key_cb(GLFWwindow *, int key, int, int action, int) {
+  if (action != GLFW_PRESS)
+    return;
+  switch (key) {
+  case GLFW_KEY_X:
+    cam.yaw = glm::radians(90.0f);
+    cam.pitch = 0.0f;
+    break;
+  case GLFW_KEY_Y:
+    cam.yaw = 0.0f;
+    cam.pitch = glm::radians(89.0f);
+    break;
+  case GLFW_KEY_Z:
+    cam.yaw = 0.0f;
+    cam.pitch = 0.0f;
+    break;
+  }
+}
+
 static void scroll_cb(GLFWwindow *, double, double dy) {
   cam.dist *= powf(0.9f, (float)dy);
   if (cam.dist < 0.01f)
@@ -193,6 +212,7 @@ int main() {
 
   glfwMakeContextCurrent(win);
   glfwSwapInterval(1);
+  glfwSetKeyCallback(win, key_cb);
   glfwSetMouseButtonCallback(win, mouse_button_cb);
   glfwSetCursorPosCallback(win, cursor_pos_cb);
   glfwSetScrollCallback(win, scroll_cb);
