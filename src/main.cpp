@@ -121,6 +121,8 @@ struct Camera {
 };
 
 static Camera cam;
+static float target_yaw = cam.yaw;
+static float target_pitch = cam.pitch;
 static bool mmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
@@ -130,16 +132,16 @@ static void key_cb(GLFWwindow *, int key, int, int action, int) {
     return;
   switch (key) {
   case GLFW_KEY_X:
-    cam.yaw = glm::radians(90.0f);
-    cam.pitch = 0.0f;
+    target_yaw = glm::radians(90.0f);
+    target_pitch = 0.0f;
     break;
   case GLFW_KEY_Y:
-    cam.yaw = 0.0f;
-    cam.pitch = glm::radians(89.0f);
+    target_yaw = cam.yaw; // keep yaw; only change elevation
+    target_pitch = glm::radians(89.0f);
     break;
   case GLFW_KEY_Z:
-    cam.yaw = 0.0f;
-    cam.pitch = 0.0f;
+    target_yaw = 0.0f;
+    target_pitch = 0.0f;
     break;
   }
 }
@@ -186,10 +188,11 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
     cam.pitch += (float)dy * sensitivity;
 
     const float limit = glm::radians(89.0f);
-    if (cam.pitch > limit)
-      cam.pitch = limit;
-    if (cam.pitch < -limit)
-      cam.pitch = -limit;
+    cam.pitch = glm::clamp(cam.pitch, -limit, limit);
+
+    // Keep targets in sync so dragging doesn't fight a pending animation
+    target_yaw = cam.yaw;
+    target_pitch = cam.pitch;
   }
 }
 
@@ -315,9 +318,24 @@ int main() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
+  double prev_time = glfwGetTime();
+
   while (!glfwWindowShouldClose(win)) {
     if (glfwGetKey(win, GLFW_KEY_ESCAPE) == GLFW_PRESS)
       glfwSetWindowShouldClose(win, GLFW_TRUE);
+
+    double now = glfwGetTime();
+    float dt = (float)(now - prev_time);
+    prev_time = now;
+
+    // Smoothly interpolate camera toward target orientation.
+    // Take the shortest arc for yaw by normalising the difference to [-π, π].
+    const float speed = 8.0f;
+    float dyaw = target_yaw - cam.yaw;
+    dyaw -= glm::round(dyaw / glm::two_pi<float>()) * glm::two_pi<float>();
+    float t = 1.0f - expf(-speed * dt);
+    cam.yaw += dyaw * t;
+    cam.pitch += (target_pitch - cam.pitch) * t;
 
     int w, h;
     glfwGetFramebufferSize(win, &w, &h);
