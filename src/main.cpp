@@ -127,20 +127,21 @@ static bool mmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 
-static void key_cb(GLFWwindow *, int key, int, int action, int) {
+static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
     return;
+  bool shift = (mods & GLFW_MOD_SHIFT) != 0;
   switch (key) {
   case GLFW_KEY_X:
-    target_yaw = glm::radians(90.0f);
+    target_yaw = glm::radians(shift ? -90.0f : 90.0f);
     target_pitch = 0.0f;
     break;
   case GLFW_KEY_Y:
-    target_yaw = cam.yaw; // keep yaw; only change elevation
-    target_pitch = glm::radians(89.0f);
+    target_yaw = cam.yaw;
+    target_pitch = glm::radians(shift ? -89.0f : 89.0f);
     break;
   case GLFW_KEY_Z:
-    target_yaw = 0.0f;
+    target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
     break;
   }
