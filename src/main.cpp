@@ -399,7 +399,10 @@ int main() {
     glUniform1i(is_star_loc, 0);
 
     // Draw orbit target indicator
-    glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target);
+    float cursor_size = powf(10.0f, floorf(log10f(cam.dist)));
+    glm::mat4 axis_mvp =
+        mvp * glm::translate(glm::mat4(1.0f), cam.target) *
+        glm::scale(glm::mat4(1.0f), glm::vec3(cursor_size));
     glUniform1i(use_vc_loc, 1);
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(axis_mvp));
     glBindVertexArray(axis_vao);
