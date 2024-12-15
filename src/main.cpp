@@ -3,10 +3,106 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
+
+
+struct Glyph {
+  float tx, ty, tw, th;
+  int bx, by, bw, bh, advance;
+};
+static Glyph g_glyphs[128];
+static GLuint g_font_tex = 0;
+static GLuint g_text_prog = 0;
+static GLuint g_text_vao = 0;
+static GLuint g_text_vbo = 0;
+static int g_font_size = 0;
+
+static bool text_init(int pixel_size) {
+  const char *font_paths[] = {
+      "/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf",
+      "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+      "/usr/share/fonts/TTF/DejaVuSans.ttf",
+      "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+      nullptr,
+  };
+
+  FT_Library ft;
+  if (FT_Init_FreeType(&ft)) {
+    fprintf(stderr, "FreeType init failed\n");
+    return false;
+  }
+
+  FT_Face face = nullptr;
+  for (int i = 0; font_paths[i]; i++)
+    if (FT_New_Face(ft, font_paths[i], 0, &face) == 0)
+      break;
+  if (!face) {
+    fprintf(stderr, "No usable font found\n");
+    FT_Done_FreeType(ft);
+    return false;
+  }
+
+  FT_Set_Pixel_Sizes(face, 0, pixel_size);
+  g_font_size = pixel_size;
+
+  // Build a single-row atlas (512 wide × 2*pixel_size tall)
+  const int AW = 2048, AH = pixel_size * 2;
+  unsigned char *atlas = new unsigned char[AW * AH]();
+  int cx = 0;
+  for (int c = 32; c < 128; c++) {
+    if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+      continue;
+    FT_GlyphSlot gs = face->glyph;
+    int bw = gs->bitmap.width, bh = (int)gs->bitmap.rows;
+    if (cx + bw >= AW)
+      break;
+    for (int row = 0; row < bh; row++)
+      memcpy(&atlas[row * AW + cx], &gs->bitmap.buffer[row * gs->bitmap.pitch],
+             bw);
+    g_glyphs[c] = {(float)cx / AW,
+                   0.0f,
+                   (float)bw / AW,
+                   (float)bh / AH,
+                   gs->bitmap_left,
+                   gs->bitmap_top,
+                   bw,
+                   bh,
+                   (int)(gs->advance.x >> 6)};
+    cx += bw + 1;
+  }
+
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glGenTextures(1, &g_font_tex);
+  glBindTexture(GL_TEXTURE_2D, g_font_tex);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, AW, AH, 0, GL_RED, GL_UNSIGNED_BYTE,
+               atlas);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  delete[] atlas;
+
+  FT_Done_Face(face);
+  FT_Done_FreeType(ft);
+
+  // VAO/VBO (dynamic; 6 verts × 4 floats per glyph)
+  glGenVertexArrays(1, &g_text_vao);
+  glGenBuffers(1, &g_text_vbo);
+  glBindVertexArray(g_text_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, g_text_vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4 * 256, nullptr,
+               GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
+  glEnableVertexAttribArray(0);
+
+  // Build the text shader program using the existing helper
+  // (declared later; we only call text_draw after main sets up OpenGL)
+  return true;
+}
 
 static const char *vert_src = R"(
 #version 330 core
