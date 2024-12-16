@@ -11,6 +11,27 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 
+static const char *text_vert_src = R"(
+#version 330 core
+layout(location = 0) in vec4 vtx; // xy = screen pos, zw = uv
+uniform mat4 u_proj;
+out vec2 uv;
+void main() {
+    gl_Position = u_proj * vec4(vtx.xy, 0.0, 1.0);
+    uv = vtx.zw;
+}
+)";
+
+static const char *text_frag_src = R"(
+#version 330 core
+in vec2 uv;
+uniform sampler2D u_font;
+uniform vec3 u_text_color;
+out vec4 out_color;
+void main() {
+    out_color = vec4(u_text_color, texture(u_font, uv).r);
+}
+)";
 
 struct Glyph {
   float tx, ty, tw, th;
