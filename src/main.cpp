@@ -125,6 +125,57 @@ static bool text_init(int pixel_size) {
   return true;
 }
 
+// Draw text at screen position (x, y) with y=0 at top-left.
+// Must be called after text_init() and after g_text_prog is linked.
+static void text_draw(const char *str, float x, float y, glm::vec3 color,
+                      int sw, int sh) {
+  if (!g_text_prog || !g_font_tex)
+    return;
+
+  glUseProgram(g_text_prog);
+  glm::mat4 proj = glm::ortho(0.0f, (float)sw, (float)sh, 0.0f);
+  glUniformMatrix4fv(glGetUniformLocation(g_text_prog, "u_proj"), 1, GL_FALSE,
+                     glm::value_ptr(proj));
+  glUniform3f(glGetUniformLocation(g_text_prog, "u_text_color"), color.r,
+              color.g, color.b);
+  glUniform1i(glGetUniformLocation(g_text_prog, "u_font"), 0);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, g_font_tex);
+  glBindVertexArray(g_text_vao);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  std::vector<float> verts;
+  verts.reserve(strlen(str) * 24);
+  float cx = x;
+  for (const char *p = str; *p; p++) {
+    int c = (unsigned char)*p;
+    if (c < 32 || c >= 128) {
+      cx += g_font_size * 0.5f;
+      continue;
+    }
+    const Glyph &g = g_glyphs[c];
+    if (g.bw == 0) {
+      cx += g.advance;
+      continue;
+    }
+    float x0 = cx + g.bx, y0 = y + (g_font_size - g.by);
+    float x1 = x0 + g.bw, y1 = y0 + g.bh;
+    float u0 = g.tx, v0 = g.ty, u1 = g.tx + g.tw, v1 = g.ty + g.th;
+    float q[] = {x0, y0, u0, v0, x0, y1, u0, v1, x1, y1, u1, v1,
+                 x0, y0, u0, v0, x1, y1, u1, v1, x1, y0, u1, v0};
+    verts.insert(verts.end(), q, q + 24);
+    cx += g.advance;
+  }
+
+  glBindBuffer(GL_ARRAY_BUFFER, g_text_vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, verts.size() * sizeof(float),
+                  verts.data());
+  glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(verts.size() / 4));
+  glDisable(GL_BLEND);
+}
+
 static const char *vert_src = R"(
 #version 330 core
 layout(location = 0) in vec3 pos;
