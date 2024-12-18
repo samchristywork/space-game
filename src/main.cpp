@@ -226,9 +226,9 @@ static GLuint compile_shader(GLenum type, const char *src) {
   return s;
 }
 
-static GLuint build_program() {
-  GLuint vs = compile_shader(GL_VERTEX_SHADER, vert_src);
-  GLuint fs = compile_shader(GL_FRAGMENT_SHADER, frag_src);
+static GLuint build_program(const char *vs_src, const char *fs_src) {
+  GLuint vs = compile_shader(GL_VERTEX_SHADER, vs_src);
+  GLuint fs = compile_shader(GL_FRAGMENT_SHADER, fs_src);
 
   GLuint prog = glCreateProgram();
   glAttachShader(prog, vs);
@@ -398,7 +398,10 @@ int main() {
     return 1;
   }
 
-  GLuint prog = build_program();
+  text_init(18);
+  g_text_prog = build_program(text_vert_src, text_frag_src);
+
+  GLuint prog = build_program(vert_src, frag_src);
   GLint mvp_loc = glGetUniformLocation(prog, "mvp");
   GLint color_loc = glGetUniformLocation(prog, "u_color");
   GLint use_vc_loc = glGetUniformLocation(prog, "u_use_vertex_color");
@@ -568,14 +571,15 @@ int main() {
 
     // Draw orbit target indicator
     float cursor_size = powf(10.0f, floorf(log10f(cam.dist)));
-    glm::mat4 axis_mvp =
-        mvp * glm::translate(glm::mat4(1.0f), cam.target) *
-        glm::scale(glm::mat4(1.0f), glm::vec3(cursor_size));
+    glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target) *
+                         glm::scale(glm::mat4(1.0f), glm::vec3(cursor_size));
     glUniform1i(use_vc_loc, 1);
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(axis_mvp));
     glBindVertexArray(axis_vao);
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
+
+    text_draw("Hello, World!", 10.0f, 10.0f, {1.0f, 1.0f, 1.0f}, w, h);
 
     glfwSwapBuffers(win);
     glfwPollEvents();
