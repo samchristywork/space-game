@@ -6,7 +6,7 @@ INCS := $(shell pkg-config --cflags gl glfw3 glew freetype2) $(shell pkg-config 
 SRC := src/main.cpp
 BIN := build/main
 
-.PHONY: all clean run
+.PHONY: all clean run valgrind
 
 all: $(BIN)
 
@@ -18,6 +18,9 @@ build:
 
 run: $(BIN)
 	./$(BIN)
+
+valgrind: $(BIN)
+	valgrind --leak-check=full --track-origins=yes ./$(BIN)
 
 clean:
 	rm -rf build
