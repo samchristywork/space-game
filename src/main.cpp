@@ -579,7 +579,20 @@ int main() {
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
 
-    text_draw("Hello, World!", 10.0f, 10.0f, {1.0f, 1.0f, 1.0f}, w, h);
+    // FPS counter: update display value once per second
+    static int fps_frames = 0;
+    static float fps_elapsed = 0.0f;
+    static int fps_display = 0;
+    fps_frames++;
+    fps_elapsed += dt;
+    if (fps_elapsed >= 1.0f) {
+      fps_display = (int)(fps_frames / fps_elapsed + 0.5f);
+      fps_frames = 0;
+      fps_elapsed = 0.0f;
+    }
+    char fps_buf[16];
+    snprintf(fps_buf, sizeof(fps_buf), "%d", fps_display);
+    text_draw(fps_buf, 10.0f, 10.0f, {1.0f, 1.0f, 1.0f}, w, h);
 
     glfwSwapBuffers(win);
     glfwPollEvents();
