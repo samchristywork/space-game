@@ -594,6 +594,12 @@ int main() {
     snprintf(fps_buf, sizeof(fps_buf), "%d", fps_display);
     text_draw(fps_buf, 10.0f, 10.0f, {1.0f, 1.0f, 1.0f}, w, h);
 
+    char pos_buf[64];
+    snprintf(pos_buf, sizeof(pos_buf), "%.2f  %.2f  %.2f", cam.target.x,
+             cam.target.y, cam.target.z);
+    text_draw(pos_buf, 10.0f, 10.0f + g_font_size + 4.0f, {0.7f, 0.7f, 0.7f}, w,
+              h);
+
     glfwSwapBuffers(win);
     glfwPollEvents();
   }
