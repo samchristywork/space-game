@@ -249,6 +249,25 @@ static GLuint build_program(const char *vs_src, const char *fs_src) {
   return prog;
 }
 
+// UV sphere: pos(3)+color(3) interleaved, indexed triangles
+static void gen_sphere(std::vector<float> &verts, std::vector<GLuint> &idx,
+                       float r, int lat, int lon, glm::vec3 col) {
+  for (int i = 0; i <= lat; i++) {
+    float theta = (float)M_PI * i / lat;
+    for (int j = 0; j <= lon; j++) {
+      float phi = 2.0f * (float)M_PI * j / lon;
+      verts.insert(verts.end(),
+                   {r * sinf(theta) * cosf(phi), r * cosf(theta),
+                    r * sinf(theta) * sinf(phi), col.r, col.g, col.b});
+    }
+  }
+  for (int i = 0; i < lat; i++)
+    for (int j = 0; j < lon; j++) {
+      GLuint a = i * (lon + 1) + j, b = a + lon + 1;
+      idx.insert(idx.end(), {a, b, a + 1, b, b + 1, a + 1});
+    }
+}
+
 // Local stars scattered around the scene.
 // Colors approximate stellar spectral types (O=blue → M=red).
 struct LocalStar {
