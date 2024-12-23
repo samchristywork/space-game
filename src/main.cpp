@@ -442,6 +442,28 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Planet sphere
+  std::vector<float> planet_verts;
+  std::vector<GLuint> planet_idx;
+  gen_sphere(planet_verts, planet_idx, 0.08f, 24, 24, {0.3f, 0.45f, 0.6f});
+
+  GLuint planet_vao, planet_vbo, planet_ebo;
+  glGenVertexArrays(1, &planet_vao);
+  glGenBuffers(1, &planet_vbo);
+  glGenBuffers(1, &planet_ebo);
+  glBindVertexArray(planet_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, planet_vbo);
+  glBufferData(GL_ARRAY_BUFFER, planet_verts.size() * sizeof(float),
+               planet_verts.data(), GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, planet_idx.size() * sizeof(GLuint),
+               planet_idx.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
   // Interleaved: pos(3) + color(3)
   float axis_verts[] = {
@@ -588,6 +610,21 @@ int main() {
     glDisable(GL_BLEND);
     glUniform1i(is_star_loc, 0);
 
+    // Draw planet
+    static float orbit_angle = 0.0f;
+    orbit_angle += dt * (2.0f * (float)M_PI / 12.0f); // 12-second period
+    const float orbit_radius = 0.8f, orbit_tilt = glm::radians(7.0f);
+    glm::vec3 planet_pos = {orbit_radius * cosf(orbit_angle),
+                            orbit_radius * sinf(orbit_tilt) * sinf(orbit_angle),
+                            orbit_radius * sinf(orbit_angle)};
+    glm::mat4 planet_mvp = mvp * glm::translate(glm::mat4(1.0f), planet_pos);
+    glUniform1i(use_vc_loc, 1);
+    glUniform1i(is_star_loc, 0);
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(planet_mvp));
+    glBindVertexArray(planet_vao);
+    glDrawElements(GL_TRIANGLES, (GLsizei)planet_idx.size(), GL_UNSIGNED_INT,
+                   nullptr);
+
     // Draw orbit target indicator
     float cursor_size = powf(10.0f, floorf(log10f(cam.dist)));
     glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target) *
@@ -623,6 +660,9 @@ int main() {
     glfwPollEvents();
   }
 
+  glDeleteVertexArrays(1, &planet_vao);
+  glDeleteBuffers(1, &planet_vbo);
+  glDeleteBuffers(1, &planet_ebo);
   glDeleteVertexArrays(1, &sun_vao);
   glDeleteBuffers(1, &sun_vbo);
   glDeleteVertexArrays(1, &axis_vao);
