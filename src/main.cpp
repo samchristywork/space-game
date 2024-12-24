@@ -464,6 +464,33 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Planet orbit line
+  static constexpr int ORBIT_SEGS = 128;
+  static constexpr float ORBIT_RADIUS = 0.8f;
+  static constexpr float ORBIT_TILT = 7.0f * (float)M_PI / 180.0f;
+  std::vector<float> orbit_verts;
+  orbit_verts.reserve(ORBIT_SEGS * 6);
+  for (int i = 0; i < ORBIT_SEGS; i++) {
+    float a = 2.0f * (float)M_PI * i / ORBIT_SEGS;
+    float x = ORBIT_RADIUS * cosf(a);
+    float y = ORBIT_RADIUS * sinf(ORBIT_TILT) * sinf(a);
+    float z = ORBIT_RADIUS * sinf(a);
+    orbit_verts.insert(orbit_verts.end(), {x, y, z, 0.4f, 0.4f, 0.5f});
+  }
+
+  GLuint orbit_vao, orbit_vbo;
+  glGenVertexArrays(1, &orbit_vao);
+  glGenBuffers(1, &orbit_vbo);
+  glBindVertexArray(orbit_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, orbit_vbo);
+  glBufferData(GL_ARRAY_BUFFER, orbit_verts.size() * sizeof(float),
+               orbit_verts.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
   // Interleaved: pos(3) + color(3)
   float axis_verts[] = {
@@ -625,6 +652,11 @@ int main() {
     glDrawElements(GL_TRIANGLES, (GLsizei)planet_idx.size(), GL_UNSIGNED_INT,
                    nullptr);
 
+    // Draw planet orbit line
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
+    glBindVertexArray(orbit_vao);
+    glDrawArrays(GL_LINE_LOOP, 0, ORBIT_SEGS);
+
     // Draw orbit target indicator
     float cursor_size = powf(10.0f, floorf(log10f(cam.dist)));
     glm::mat4 axis_mvp = mvp * glm::translate(glm::mat4(1.0f), cam.target) *
@@ -660,6 +692,8 @@ int main() {
     glfwPollEvents();
   }
 
+  glDeleteVertexArrays(1, &orbit_vao);
+  glDeleteBuffers(1, &orbit_vbo);
   glDeleteVertexArrays(1, &planet_vao);
   glDeleteBuffers(1, &planet_vbo);
   glDeleteBuffers(1, &planet_ebo);
