@@ -249,6 +249,15 @@ static GLuint build_program(const char *vs_src, const char *fs_src) {
   return prog;
 }
 
+struct Planet {
+  glm::vec3 star_pos;
+  float orbit_radius, orbit_tilt, orbit_period, orbit_angle;
+  GLuint vao, vbo, ebo;
+  GLsizei idx_count;
+  GLuint orbit_vao, orbit_vbo;
+};
+static std::vector<Planet> g_planets;
+
 // UV sphere: pos(3)+color(3) interleaved, indexed triangles
 static void gen_sphere(std::vector<float> &verts, std::vector<GLuint> &idx,
                        float r, int lat, int lon, glm::vec3 col) {
@@ -442,54 +451,90 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  // Planet sphere
-  std::vector<float> planet_verts;
-  std::vector<GLuint> planet_idx;
-  gen_sphere(planet_verts, planet_idx, 0.08f, 24, 24, {0.3f, 0.45f, 0.6f});
+  // Generate planets for all stars
+  // Orbital periods follow Kepler's 3rd law: T = base_period * r^1.5
+  static constexpr int ORBIT_SEGS = 64;
+  static constexpr float BASE_PERIOD = 20.0f; // seconds at r=1
+  srand(1337);
+  for (const auto &star : LOCAL_STARS) {
+    int n = 1 + rand() % 10;
+    float r = 0.15f + (rand() / (float)RAND_MAX) * 0.15f; // innermost radius
+    for (int p = 0; p < n; p++) {
+      Planet pl;
+      pl.star_pos = star.pos;
+      pl.orbit_radius = r;
+      pl.orbit_tilt = (rand() / (float)RAND_MAX) * glm::radians(30.0f);
+      pl.orbit_period = BASE_PERIOD * powf(r, 1.5f);
+      pl.orbit_angle = (rand() / (float)RAND_MAX) * 2.0f * (float)M_PI;
 
-  GLuint planet_vao, planet_vbo, planet_ebo;
-  glGenVertexArrays(1, &planet_vao);
-  glGenBuffers(1, &planet_vbo);
-  glGenBuffers(1, &planet_ebo);
-  glBindVertexArray(planet_vao);
-  glBindBuffer(GL_ARRAY_BUFFER, planet_vbo);
-  glBufferData(GL_ARRAY_BUFFER, planet_verts.size() * sizeof(float),
-               planet_verts.data(), GL_STATIC_DRAW);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_ebo);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, planet_idx.size() * sizeof(GLuint),
-               planet_idx.data(), GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                        (void *)(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
+      // Size and color by zone: rocky (inner) → gas giant → ice giant
+      float size;
+      glm::vec3 col;
+      if (r < 0.5f) {
+        size = 0.02f + (rand() / (float)RAND_MAX) * 0.03f;
+        float t = rand() / (float)RAND_MAX;
+        col = glm::mix(glm::vec3(0.55f, 0.38f, 0.28f),
+                       glm::vec3(0.70f, 0.55f, 0.42f), t);
+      } else if (r < 1.1f) {
+        size = 0.05f + (rand() / (float)RAND_MAX) * 0.05f;
+        float t = rand() / (float)RAND_MAX;
+        col = glm::mix(glm::vec3(0.78f, 0.62f, 0.38f),
+                       glm::vec3(0.68f, 0.50f, 0.32f), t);
+      } else {
+        size = 0.03f + (rand() / (float)RAND_MAX) * 0.04f;
+        float t = rand() / (float)RAND_MAX;
+        col = glm::mix(glm::vec3(0.38f, 0.58f, 0.80f),
+                       glm::vec3(0.52f, 0.72f, 0.90f), t);
+      }
 
-  // Planet orbit line
-  static constexpr int ORBIT_SEGS = 128;
-  static constexpr float ORBIT_RADIUS = 0.8f;
-  static constexpr float ORBIT_TILT = 7.0f * (float)M_PI / 180.0f;
-  std::vector<float> orbit_verts;
-  orbit_verts.reserve(ORBIT_SEGS * 6);
-  for (int i = 0; i < ORBIT_SEGS; i++) {
-    float a = 2.0f * (float)M_PI * i / ORBIT_SEGS;
-    float x = ORBIT_RADIUS * cosf(a);
-    float y = ORBIT_RADIUS * sinf(ORBIT_TILT) * sinf(a);
-    float z = ORBIT_RADIUS * sinf(a);
-    orbit_verts.insert(orbit_verts.end(), {x, y, z, 0.4f, 0.4f, 0.5f});
+      // Sphere mesh
+      std::vector<float> sv;
+      std::vector<GLuint> si;
+      gen_sphere(sv, si, size, 16, 16, col);
+      pl.idx_count = (GLsizei)si.size();
+      glGenVertexArrays(1, &pl.vao);
+      glGenBuffers(1, &pl.vbo);
+      glGenBuffers(1, &pl.ebo);
+      glBindVertexArray(pl.vao);
+      glBindBuffer(GL_ARRAY_BUFFER, pl.vbo);
+      glBufferData(GL_ARRAY_BUFFER, sv.size() * sizeof(float), sv.data(),
+                   GL_STATIC_DRAW);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, pl.ebo);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, si.size() * sizeof(GLuint),
+                   si.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)(3 * sizeof(float)));
+      glEnableVertexAttribArray(1);
+
+      // Orbit line
+      std::vector<float> ov;
+      ov.reserve(ORBIT_SEGS * 6);
+      for (int i = 0; i < ORBIT_SEGS; i++) {
+        float a = 2.0f * (float)M_PI * i / ORBIT_SEGS;
+        ov.insert(ov.end(), {r * cosf(a), r * sinf(pl.orbit_tilt) * sinf(a),
+                             r * sinf(a), 0.35f, 0.35f, 0.45f});
+      }
+      glGenVertexArrays(1, &pl.orbit_vao);
+      glGenBuffers(1, &pl.orbit_vbo);
+      glBindVertexArray(pl.orbit_vao);
+      glBindBuffer(GL_ARRAY_BUFFER, pl.orbit_vbo);
+      glBufferData(GL_ARRAY_BUFFER, ov.size() * sizeof(float), ov.data(),
+                   GL_STATIC_DRAW);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)(3 * sizeof(float)));
+      glEnableVertexAttribArray(1);
+
+      g_planets.push_back(pl);
+      r +=
+          0.15f + (rand() / (float)RAND_MAX) * 0.35f; // next planet farther out
+    }
   }
-
-  GLuint orbit_vao, orbit_vbo;
-  glGenVertexArrays(1, &orbit_vao);
-  glGenBuffers(1, &orbit_vbo);
-  glBindVertexArray(orbit_vao);
-  glBindBuffer(GL_ARRAY_BUFFER, orbit_vbo);
-  glBufferData(GL_ARRAY_BUFFER, orbit_verts.size() * sizeof(float),
-               orbit_verts.data(), GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                        (void *)(3 * sizeof(float)));
-  glEnableVertexAttribArray(1);
 
   // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
   // Interleaved: pos(3) + color(3)
@@ -637,25 +682,27 @@ int main() {
     glDisable(GL_BLEND);
     glUniform1i(is_star_loc, 0);
 
-    // Draw planet
-    static float orbit_angle = 0.0f;
-    orbit_angle += dt * (2.0f * (float)M_PI / 12.0f); // 12-second period
-    const float orbit_radius = 0.8f, orbit_tilt = glm::radians(7.0f);
-    glm::vec3 planet_pos = {orbit_radius * cosf(orbit_angle),
-                            orbit_radius * sinf(orbit_tilt) * sinf(orbit_angle),
-                            orbit_radius * sinf(orbit_angle)};
-    glm::mat4 planet_mvp = mvp * glm::translate(glm::mat4(1.0f), planet_pos);
+    // Draw all planets and orbit lines
     glUniform1i(use_vc_loc, 1);
     glUniform1i(is_star_loc, 0);
-    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(planet_mvp));
-    glBindVertexArray(planet_vao);
-    glDrawElements(GL_TRIANGLES, (GLsizei)planet_idx.size(), GL_UNSIGNED_INT,
-                   nullptr);
+    for (auto &pl : g_planets) {
+      pl.orbit_angle += dt * (2.0f * (float)M_PI / pl.orbit_period);
+      glm::vec3 pos =
+          pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
+                                  pl.orbit_radius * sinf(pl.orbit_tilt) *
+                                      sinf(pl.orbit_angle),
+                                  pl.orbit_radius * sinf(pl.orbit_angle));
 
-    // Draw planet orbit line
-    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
-    glBindVertexArray(orbit_vao);
-    glDrawArrays(GL_LINE_LOOP, 0, ORBIT_SEGS);
+      glm::mat4 planet_mvp = mvp * glm::translate(glm::mat4(1.0f), pos);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(planet_mvp));
+      glBindVertexArray(pl.vao);
+      glDrawElements(GL_TRIANGLES, pl.idx_count, GL_UNSIGNED_INT, nullptr);
+
+      glm::mat4 orbit_mvp = mvp * glm::translate(glm::mat4(1.0f), pl.star_pos);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(orbit_mvp));
+      glBindVertexArray(pl.orbit_vao);
+      glDrawArrays(GL_LINE_LOOP, 0, ORBIT_SEGS);
+    }
 
     // Draw orbit target indicator
     float cursor_size = powf(10.0f, floorf(log10f(cam.dist)));
@@ -692,11 +739,13 @@ int main() {
     glfwPollEvents();
   }
 
-  glDeleteVertexArrays(1, &orbit_vao);
-  glDeleteBuffers(1, &orbit_vbo);
-  glDeleteVertexArrays(1, &planet_vao);
-  glDeleteBuffers(1, &planet_vbo);
-  glDeleteBuffers(1, &planet_ebo);
+  for (auto &pl : g_planets) {
+    glDeleteVertexArrays(1, &pl.vao);
+    glDeleteBuffers(1, &pl.vbo);
+    glDeleteBuffers(1, &pl.ebo);
+    glDeleteVertexArrays(1, &pl.orbit_vao);
+    glDeleteBuffers(1, &pl.orbit_vbo);
+  }
   glDeleteVertexArrays(1, &sun_vao);
   glDeleteBuffers(1, &sun_vbo);
   glDeleteVertexArrays(1, &axis_vao);
