@@ -127,6 +127,18 @@ static bool text_init(int pixel_size) {
 
 // Draw text at screen position (x, y) with y=0 at top-left.
 // Must be called after text_init() and after g_text_prog is linked.
+static float text_width(const char *str) {
+  float w = 0;
+  for (const char *p = str; *p; p++) {
+    int c = (unsigned char)*p;
+    if (c >= 32 && c < 128)
+      w += g_glyphs[c].advance;
+    else
+      w += g_font_size * 0.5f;
+  }
+  return w;
+}
+
 static void text_draw(const char *str, float x, float y, glm::vec3 color,
                       int sw, int sh) {
   if (!g_text_prog || !g_font_tex)
@@ -317,6 +329,7 @@ struct Camera {
 };
 
 static Camera cam;
+static float g_timescale = 1.0f;
 static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
 static bool mmb_down = false;
@@ -734,6 +747,11 @@ int main() {
              cam.target.y, cam.target.z);
     text_draw(pos_buf, 10.0f, 10.0f + g_font_size + 4.0f, {0.7f, 0.7f, 0.7f}, w,
               h);
+
+    char ts_buf[32];
+    snprintf(ts_buf, sizeof(ts_buf), "%gx", g_timescale);
+    text_draw(ts_buf, w - text_width(ts_buf) - 10.0f, 10.0f, {0.8f, 0.8f, 0.8f},
+              w, h);
 
     glfwSwapBuffers(win);
     glfwPollEvents();
