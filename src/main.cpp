@@ -353,6 +353,12 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
     break;
+  case GLFW_KEY_COMMA:
+    g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
+    break;
+  case GLFW_KEY_PERIOD:
+    g_timescale = fminf(g_timescale * 10.0f, 1e6f);
+    break;
   }
 }
 
@@ -699,7 +705,8 @@ int main() {
     glUniform1i(use_vc_loc, 1);
     glUniform1i(is_star_loc, 0);
     for (auto &pl : g_planets) {
-      pl.orbit_angle += dt * (2.0f * (float)M_PI / pl.orbit_period);
+      pl.orbit_angle +=
+          dt * g_timescale * (2.0f * (float)M_PI / pl.orbit_period);
       glm::vec3 pos =
           pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
                                   pl.orbit_radius * sinf(pl.orbit_tilt) *
