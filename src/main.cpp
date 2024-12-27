@@ -707,6 +707,7 @@ int main() {
     for (auto &pl : g_planets) {
       pl.orbit_angle +=
           dt * g_timescale * (2.0f * (float)M_PI / pl.orbit_period);
+      pl.orbit_angle = fmodf(pl.orbit_angle, 2.0f * (float)M_PI);
       glm::vec3 pos =
           pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
                                   pl.orbit_radius * sinf(pl.orbit_tilt) *
