@@ -534,7 +534,7 @@ int main() {
       for (int i = 0; i < ORBIT_SEGS; i++) {
         float a = 2.0f * (float)M_PI * i / ORBIT_SEGS;
         ov.insert(ov.end(), {r * cosf(a), r * sinf(pl.orbit_tilt) * sinf(a),
-                             r * sinf(a), 0.35f, 0.35f, 0.45f});
+                             r * sinf(a), 0.18f, 0.18f, 0.25f});
       }
       glGenVertexArrays(1, &pl.orbit_vao);
       glGenBuffers(1, &pl.orbit_vbo);
@@ -722,6 +722,7 @@ int main() {
       glm::mat4 orbit_mvp = mvp * glm::translate(glm::mat4(1.0f), pl.star_pos);
       glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(orbit_mvp));
       glBindVertexArray(pl.orbit_vao);
+      glLineWidth(1.0f);
       glDrawArrays(GL_LINE_LOOP, 0, ORBIT_SEGS);
     }
 
