@@ -330,6 +330,8 @@ struct Camera {
 
 static Camera cam;
 static float g_timescale = 1.0f;
+static bool g_pick_pending = false;
+static double g_pick_x = 0.0, g_pick_y = 0.0;
 static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
 static bool mmb_down = false;
@@ -368,9 +370,13 @@ static void scroll_cb(GLFWwindow *, double, double dy) {
     cam.dist = 0.01f;
 }
 
-static void mouse_button_cb(GLFWwindow *, int button, int action, int) {
+static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    g_pick_pending = true;
+    glfwGetCursorPos(win, &g_pick_x, &g_pick_y);
+  }
 }
 
 static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
@@ -652,6 +658,48 @@ int main() {
         glm::perspective(glm::radians(45.0f), (float)w / h, 0.1f, 1000.0f);
     glm::mat4 view = cam.view();
     glm::mat4 mvp = proj * view;
+
+    // Star picking: project each star to screen space, find closest to click
+    if (g_pick_pending) {
+      g_pick_pending = false;
+      static const char *spectral[] = {
+          "G (yellow)",       "B (blue-white)",   "M (red dwarf)",
+          "A (white)",        "K (orange)",       "O (hot blue)",
+          "F (yellow-white)", "K (orange giant)", "B (blue)",
+          "M (red)",          "A (white)",
+      };
+      int best = -1;
+      float best_d = 30.0f; // pixel threshold
+      for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+           i++) {
+        glm::vec4 clip = proj * view * glm::vec4(LOCAL_STARS[i].pos, 1.0f);
+        if (clip.w <= 0.0f)
+          continue;
+        glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        float sx = (ndc.x * 0.5f + 0.5f) * w;
+        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * h;
+        float d = sqrtf((float)(g_pick_x - sx) * (float)(g_pick_x - sx) +
+                        (float)(g_pick_y - sy) * (float)(g_pick_y - sy));
+        if (d < best_d) {
+          best_d = d;
+          best = i;
+        }
+      }
+      if (best >= 0) {
+        const LocalStar &s = LOCAL_STARS[best];
+        int n_planets = 0;
+        for (const auto &pl : g_planets)
+          if (pl.star_pos == s.pos)
+            n_planets++;
+        printf("Star %d\n", best);
+        printf("  Type:     %s\n", spectral[best]);
+        printf("  Position: (%.3f, %.3f, %.3f)\n", s.pos.x, s.pos.y, s.pos.z);
+        printf("  Color:    (%.2f, %.2f, %.2f)\n", s.color.r, s.color.g,
+               s.color.b);
+        printf("  Planets:  %d\n", n_planets);
+        fflush(stdout);
+      }
+    }
 
     // Rotation-only view for stars (strip translation so they're at infinity)
     glm::mat4 view_rot = glm::mat4(glm::mat3(view));
