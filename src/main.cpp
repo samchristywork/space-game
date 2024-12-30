@@ -659,7 +659,7 @@ int main() {
     glm::mat4 view = cam.view();
     glm::mat4 mvp = proj * view;
 
-    // Star picking: project each star to screen space, find closest to click
+    // Picking: find the star or planet closest to a left-click
     if (g_pick_pending) {
       g_pick_pending = false;
       static const char *spectral[] = {
@@ -668,35 +668,81 @@ int main() {
           "F (yellow-white)", "K (orange giant)", "B (blue)",
           "M (red)",          "A (white)",
       };
-      int best = -1;
-      float best_d = 30.0f; // pixel threshold
-      for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
-           i++) {
-        glm::vec4 clip = proj * view * glm::vec4(LOCAL_STARS[i].pos, 1.0f);
+
+      auto screen_dist = [&](glm::vec3 world) -> float {
+        glm::vec4 clip = proj * view * glm::vec4(world, 1.0f);
         if (clip.w <= 0.0f)
-          continue;
+          return 1e9f;
         glm::vec3 ndc = glm::vec3(clip) / clip.w;
         float sx = (ndc.x * 0.5f + 0.5f) * w;
         float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * h;
-        float d = sqrtf((float)(g_pick_x - sx) * (float)(g_pick_x - sx) +
-                        (float)(g_pick_y - sy) * (float)(g_pick_y - sy));
+        float dx = (float)g_pick_x - sx, dy = (float)g_pick_y - sy;
+        return sqrtf(dx * dx + dy * dy);
+      };
+
+      float best_d = 20.0f;
+      int best_star = -1, best_planet = -1;
+
+      for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+           i++) {
+        float d = screen_dist(LOCAL_STARS[i].pos);
         if (d < best_d) {
           best_d = d;
-          best = i;
+          best_star = i;
+          best_planet = -1;
         }
       }
-      if (best >= 0) {
-        const LocalStar &s = LOCAL_STARS[best];
+      for (int i = 0; i < (int)g_planets.size(); i++) {
+        const Planet &pl = g_planets[i];
+        glm::vec3 pos =
+            pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_tilt) *
+                                        sinf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_angle));
+        float d = screen_dist(pos);
+        if (d < best_d) {
+          best_d = d;
+          best_planet = i;
+          best_star = -1;
+        }
+      }
+
+      if (best_star >= 0) {
+        const LocalStar &s = LOCAL_STARS[best_star];
         int n_planets = 0;
         for (const auto &pl : g_planets)
           if (pl.star_pos == s.pos)
             n_planets++;
-        printf("Star %d\n", best);
-        printf("  Type:     %s\n", spectral[best]);
+        printf("Star %d\n", best_star);
+        printf("  Type:     %s\n", spectral[best_star]);
         printf("  Position: (%.3f, %.3f, %.3f)\n", s.pos.x, s.pos.y, s.pos.z);
         printf("  Color:    (%.2f, %.2f, %.2f)\n", s.color.r, s.color.g,
                s.color.b);
         printf("  Planets:  %d\n", n_planets);
+        fflush(stdout);
+      } else if (best_planet >= 0) {
+        const Planet &pl = g_planets[best_planet];
+        int parent = -1;
+        for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+             i++)
+          if (LOCAL_STARS[i].pos == pl.star_pos) {
+            parent = i;
+            break;
+          }
+        const char *zone = pl.orbit_radius < 0.5f   ? "Rocky"
+                           : pl.orbit_radius < 1.1f ? "Gas giant"
+                                                    : "Ice giant";
+        glm::vec3 pos =
+            pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_tilt) *
+                                        sinf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_angle));
+        printf("Planet %d (Star %d)\n", best_planet, parent);
+        printf("  Zone:         %s\n", zone);
+        printf("  Position:     (%.3f, %.3f, %.3f)\n", pos.x, pos.y, pos.z);
+        printf("  Orbit radius: %.3f\n", pl.orbit_radius);
+        printf("  Orbit period: %.2f s\n", pl.orbit_period);
+        printf("  Orbit tilt:   %.1f deg\n", glm::degrees(pl.orbit_tilt));
         fflush(stdout);
       }
     }
