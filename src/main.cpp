@@ -270,6 +270,12 @@ struct Planet {
 };
 static std::vector<Planet> g_planets;
 
+struct Spaceship {
+  glm::vec3 pos;
+  GLuint vao, vbo;
+};
+static Spaceship g_ship;
+
 // UV sphere: pos(3)+color(3) interleaved, indexed triangles
 static void gen_sphere(std::vector<float> &verts, std::vector<GLuint> &idx,
                        float r, int lat, int lon, glm::vec3 col) {
@@ -587,6 +593,45 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Spaceship: octahedron wireframe icon, unit-sized (scaled at render time)
+  // Vertices: top, bottom, +x, -x, +z, -z
+  // 12 line segments as GL_LINES (24 verts × 6 floats)
+  {
+    g_ship.pos = {0.4f, 0.0f, 0.0f}; // near the sun, will be updated later
+
+    const float cx = 0.2f, cy = 1.0f, cz = 0.9f; // cyan-ish
+    // clang-format off
+    float sv[] = {
+      // top to equatorial
+       0,  1,  0,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
+       0,  1,  0,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
+       0,  1,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
+       0,  1,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
+      // bottom to equatorial
+       0, -1,  0,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
+       0, -1,  0,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
+       0, -1,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
+       0, -1,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
+      // equatorial ring
+       1,  0,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
+       0,  0,  1,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
+      -1,  0,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
+       0,  0, -1,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
+    };
+    // clang-format on
+    glGenVertexArrays(1, &g_ship.vao);
+    glGenBuffers(1, &g_ship.vbo);
+    glBindVertexArray(g_ship.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, g_ship.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(sv), sv, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                          (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+  }
+
   // Stars: random points on a unit sphere, rendered with rotation-only view
   // so they appear infinitely distant regardless of camera position.
   static constexpr int NUM_STARS = 3000;
@@ -682,6 +727,7 @@ int main() {
 
       float best_d = 20.0f;
       int best_star = -1, best_planet = -1;
+      bool best_ship = false;
 
       for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
            i++) {
@@ -704,6 +750,16 @@ int main() {
           best_d = d;
           best_planet = i;
           best_star = -1;
+          best_ship = false;
+        }
+      }
+      {
+        float d = screen_dist(g_ship.pos);
+        if (d < best_d) {
+          best_d = d;
+          best_ship = true;
+          best_star = -1;
+          best_planet = -1;
         }
       }
 
@@ -719,6 +775,11 @@ int main() {
         printf("  Color:    (%.2f, %.2f, %.2f)\n", s.color.r, s.color.g,
                s.color.b);
         printf("  Planets:  %d\n", n_planets);
+        fflush(stdout);
+      } else if (best_ship) {
+        printf("Spaceship\n");
+        printf("  Position: (%.3f, %.3f, %.3f)\n", g_ship.pos.x, g_ship.pos.y,
+               g_ship.pos.z);
         fflush(stdout);
       } else if (best_planet >= 0) {
         const Planet &pl = g_planets[best_planet];
@@ -830,6 +891,19 @@ int main() {
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
 
+    // Draw spaceship icon: octahedron wireframe scaled to stay visible
+    {
+      float ship_scale = cam.dist * 0.015f;
+      glm::mat4 ship_mvp = mvp * glm::translate(glm::mat4(1.0f), g_ship.pos) *
+                           glm::scale(glm::mat4(1.0f), glm::vec3(ship_scale));
+      glUniform1i(use_vc_loc, 1);
+      glUniform1i(is_star_loc, 0);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(ship_mvp));
+      glBindVertexArray(g_ship.vao);
+      glLineWidth(1.5f);
+      glDrawArrays(GL_LINES, 0, 24);
+    }
+
     // FPS counter: update display value once per second
     static int fps_frames = 0;
     static float fps_elapsed = 0.0f;
@@ -867,6 +941,8 @@ int main() {
     glDeleteVertexArrays(1, &pl.orbit_vao);
     glDeleteBuffers(1, &pl.orbit_vbo);
   }
+  glDeleteVertexArrays(1, &g_ship.vao);
+  glDeleteBuffers(1, &g_ship.vbo);
   glDeleteVertexArrays(1, &sun_vao);
   glDeleteBuffers(1, &sun_vbo);
   glDeleteVertexArrays(1, &axis_vao);
