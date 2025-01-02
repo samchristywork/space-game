@@ -593,37 +593,16 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  // Spaceship: octahedron wireframe icon, unit-sized (scaled at render time)
-  // Vertices: top, bottom, +x, -x, +z, -z
-  // 12 line segments as GL_LINES (24 verts × 6 floats)
+  // Spaceship: billboard triangle, vertices computed each frame from camera
+  // axes
   {
-    g_ship.pos = {0.4f, 0.0f, 0.0f}; // near the sun, will be updated later
-
-    const float cx = 0.2f, cy = 1.0f, cz = 0.9f; // cyan-ish
-    // clang-format off
-    float sv[] = {
-      // top to equatorial
-       0,  1,  0,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
-       0,  1,  0,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
-       0,  1,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
-       0,  1,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
-      // bottom to equatorial
-       0, -1,  0,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
-       0, -1,  0,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
-       0, -1,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
-       0, -1,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
-      // equatorial ring
-       1,  0,  0,  cx, cy, cz,   0,  0,  1,  cx, cy, cz,
-       0,  0,  1,  cx, cy, cz,  -1,  0,  0,  cx, cy, cz,
-      -1,  0,  0,  cx, cy, cz,   0,  0, -1,  cx, cy, cz,
-       0,  0, -1,  cx, cy, cz,   1,  0,  0,  cx, cy, cz,
-    };
-    // clang-format on
+    g_ship.pos = {0.4f, 0.0f, 0.0f};
     glGenVertexArrays(1, &g_ship.vao);
     glGenBuffers(1, &g_ship.vbo);
     glBindVertexArray(g_ship.vao);
     glBindBuffer(GL_ARRAY_BUFFER, g_ship.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(sv), sv, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 3 * 6 * sizeof(float), nullptr,
+                 GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
                           (void *)0);
     glEnableVertexAttribArray(0);
@@ -891,17 +870,26 @@ int main() {
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
 
-    // Draw spaceship icon: octahedron wireframe scaled to stay visible
+    // Draw spaceship: billboard triangle always facing the camera.
+    // Build vertices in world space using the camera's right and up axes.
     {
-      float ship_scale = cam.dist * 0.015f;
-      glm::mat4 ship_mvp = mvp * glm::translate(glm::mat4(1.0f), g_ship.pos) *
-                           glm::scale(glm::mat4(1.0f), glm::vec3(ship_scale));
+      glm::vec3 cam_right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+      glm::vec3 cam_up = glm::vec3(view[0][1], view[1][1], view[2][1]);
+      float s = cam.dist * 0.012f;
+      glm::vec3 v0 = g_ship.pos + s * (cam_up * 0.6f);
+      glm::vec3 v1 = g_ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
+      glm::vec3 v2 = g_ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
+      float sv[] = {
+          v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
+          0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
+      };
+      glBindVertexArray(g_ship.vao);
+      glBindBuffer(GL_ARRAY_BUFFER, g_ship.vbo);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
       glUniform1i(use_vc_loc, 1);
       glUniform1i(is_star_loc, 0);
-      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(ship_mvp));
-      glBindVertexArray(g_ship.vao);
-      glLineWidth(1.5f);
-      glDrawArrays(GL_LINES, 0, 24);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
+      glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 
     // FPS counter: update display value once per second
