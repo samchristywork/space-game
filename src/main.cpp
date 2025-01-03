@@ -120,13 +120,9 @@ static bool text_init(int pixel_size) {
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
   glEnableVertexAttribArray(0);
 
-  // Build the text shader program using the existing helper
-  // (declared later; we only call text_draw after main sets up OpenGL)
   return true;
 }
 
-// Draw text at screen position (x, y) with y=0 at top-left.
-// Must be called after text_init() and after g_text_prog is linked.
 static float text_width(const char *str) {
   float w = 0;
   for (const char *p = str; *p; p++) {
@@ -213,7 +209,7 @@ out vec4 color;
 void main() {
     vec3 c = u_use_vertex_color ? frag_color : u_color;
     if (u_is_star) {
-        float d = length(gl_PointCoord - 0.5) * 2.0; // 0=centre, 1=edge
+        float d = length(gl_PointCoord - 0.5) * 2.0;
         float a = exp(-d * u_glow_falloff);
         color = vec4(c * a, a);
     } else {
@@ -274,7 +270,7 @@ struct Spaceship {
   glm::vec3 pos;
   GLuint vao, vbo;
 };
-static Spaceship g_ship;
+static std::vector<Spaceship> g_ships;
 
 // UV sphere: pos(3)+color(3) interleaved, indexed triangles
 static void gen_sphere(std::vector<float> &verts, std::vector<GLuint> &idx,
@@ -295,17 +291,13 @@ static void gen_sphere(std::vector<float> &verts, std::vector<GLuint> &idx,
     }
 }
 
-// Local stars scattered around the scene.
-// Colors approximate stellar spectral types (O=blue → M=red).
 struct LocalStar {
   glm::vec3 pos;
   glm::vec3 color; // base tint; glow layers are derived from this
 };
 
 static const LocalStar LOCAL_STARS[] = {
-    // Our sun (G-type, yellow) at origin
-    {{0.0f, 0.0f, 0.0f}, {1.0f, 0.90f, 0.60f}},
-    // Neighbours – varied spectral types and distances
+    {{0.0f, 0.0f, 0.0f}, {1.0f, 0.90f, 0.60f}},    // G - yellow
     {{4.0f, 1.5f, -3.0f}, {0.6f, 0.75f, 1.00f}},   // B – blue-white
     {{-5.0f, 0.5f, 2.0f}, {1.0f, 0.40f, 0.15f}},   // M – red dwarf
     {{3.0f, -2.0f, 5.0f}, {1.0f, 0.95f, 0.85f}},   // A – white
@@ -318,11 +310,10 @@ static const LocalStar LOCAL_STARS[] = {
     {{-7.0f, 1.5f, 3.0f}, {1.0f, 1.00f, 0.90f}},   // A – white
 };
 
-// Orbit camera state
 struct Camera {
-  float yaw = 0.0f;   // radians, rotation around Y axis
-  float pitch = 0.3f; // radians, elevation
-  float dist = 3.0f;  // distance from target
+  float yaw = 0.0f;
+  float pitch = 0.3f;
+  float dist = 3.0f;
   glm::vec3 target{0.0f, 0.0f, 0.0f};
 
   glm::mat4 view() const {
@@ -418,7 +409,6 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
     const float limit = glm::radians(89.0f);
     cam.pitch = glm::clamp(cam.pitch, -limit, limit);
 
-    // Keep targets in sync so dragging doesn't fight a pending animation
     target_yaw = cam.yaw;
     target_pitch = cam.pitch;
   }
@@ -448,7 +438,6 @@ int main() {
   glfwSetCursorPosCallback(win, cursor_pos_cb);
   glfwSetScrollCallback(win, scroll_cb);
 
-  // Seed last mouse position to avoid a jump on first move
   glfwGetCursorPos(win, &last_mx, &last_my);
 
   glewExperimental = GL_TRUE;
@@ -498,7 +487,6 @@ int main() {
       pl.orbit_period = BASE_PERIOD * powf(r, 1.5f);
       pl.orbit_angle = (rand() / (float)RAND_MAX) * 2.0f * (float)M_PI;
 
-      // Size and color by zone: rocky (inner) → gas giant → ice giant
       float size;
       glm::vec3 col;
       if (r < 0.5f) {
@@ -562,13 +550,10 @@ int main() {
       glEnableVertexAttribArray(1);
 
       g_planets.push_back(pl);
-      r +=
-          0.15f + (rand() / (float)RAND_MAX) * 0.35f; // next planet farther out
+      r += 0.15f + (rand() / (float)RAND_MAX) * 0.35f;
     }
   }
 
-  // Orbit target indicator: 3 axis lines, each from -0.1 to +0.1
-  // Interleaved: pos(3) + color(3)
   float axis_verts[] = {
       -0.1f, 0.0f,  0.0f,  1.0f, 0.2f, 0.2f, // X- red
       0.1f,  0.0f,  0.0f,  1.0f, 0.2f, 0.2f, // X+ red
@@ -593,22 +578,32 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  // Spaceship: billboard triangle, vertices computed each frame from camera
-  // axes
   {
-    g_ship.pos = {0.4f, 0.0f, 0.0f};
-    glGenVertexArrays(1, &g_ship.vao);
-    glGenBuffers(1, &g_ship.vbo);
-    glBindVertexArray(g_ship.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, g_ship.vbo);
-    glBufferData(GL_ARRAY_BUFFER, 3 * 6 * sizeof(float), nullptr,
-                 GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                          (void *)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                          (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+    static const glm::vec3 ship_positions[] = {
+        {0.00f, 0.00f, 0.00f},    {0.04f, 0.01f, 0.02f},
+        {-0.03f, 0.02f, -0.01f},  {0.02f, -0.03f, 0.04f},
+        {-0.01f, 0.04f, -0.03f},  {0.05f, 0.00f, -0.02f},
+        {-0.04f, -0.01f, 0.03f},  {0.01f, 0.03f, 0.05f},
+        {-0.02f, -0.04f, -0.04f}, {0.03f, 0.02f, -0.05f},
+        {-0.05f, 0.03f, 0.01f},
+    };
+    for (const auto &p : ship_positions) {
+      Spaceship s;
+      s.pos = p;
+      glGenVertexArrays(1, &s.vao);
+      glGenBuffers(1, &s.vbo);
+      glBindVertexArray(s.vao);
+      glBindBuffer(GL_ARRAY_BUFFER, s.vbo);
+      glBufferData(GL_ARRAY_BUFFER, 3 * 6 * sizeof(float), nullptr,
+                   GL_DYNAMIC_DRAW);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                            (void *)(3 * sizeof(float)));
+      glEnableVertexAttribArray(1);
+      g_ships.push_back(s);
+    }
   }
 
   // Stars: random points on a unit sphere, rendered with rotation-only view
@@ -662,8 +657,7 @@ int main() {
     float dt = (float)(now - prev_time);
     prev_time = now;
 
-    // Smoothly interpolate camera toward target orientation.
-    // Take the shortest arc for yaw by normalising the difference to [-π, π].
+    // Smoothly interpolate camera toward target orientation
     const float speed = 8.0f;
     float dyaw = target_yaw - cam.yaw;
     dyaw -= glm::round(dyaw / glm::two_pi<float>()) * glm::two_pi<float>();
@@ -706,7 +700,7 @@ int main() {
 
       float best_d = 20.0f;
       int best_star = -1, best_planet = -1;
-      bool best_ship = false;
+      int best_ship = -1;
 
       for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
            i++) {
@@ -715,6 +709,7 @@ int main() {
           best_d = d;
           best_star = i;
           best_planet = -1;
+          best_ship = -1;
         }
       }
       for (int i = 0; i < (int)g_planets.size(); i++) {
@@ -729,14 +724,14 @@ int main() {
           best_d = d;
           best_planet = i;
           best_star = -1;
-          best_ship = false;
+          best_ship = -1;
         }
       }
-      {
-        float d = screen_dist(g_ship.pos);
+      for (int i = 0; i < (int)g_ships.size(); i++) {
+        float d = screen_dist(g_ships[i].pos);
         if (d < best_d) {
           best_d = d;
-          best_ship = true;
+          best_ship = i;
           best_star = -1;
           best_planet = -1;
         }
@@ -755,10 +750,11 @@ int main() {
                s.color.b);
         printf("  Planets:  %d\n", n_planets);
         fflush(stdout);
-      } else if (best_ship) {
-        printf("Spaceship\n");
-        printf("  Position: (%.3f, %.3f, %.3f)\n", g_ship.pos.x, g_ship.pos.y,
-               g_ship.pos.z);
+      } else if (best_ship >= 0) {
+        const Spaceship &sh = g_ships[best_ship];
+        printf("Spaceship %d\n", best_ship);
+        printf("  Position: (%.3f, %.3f, %.3f)\n", sh.pos.x, sh.pos.y,
+               sh.pos.z);
         fflush(stdout);
       } else if (best_planet >= 0) {
         const Planet &pl = g_planets[best_planet];
@@ -870,26 +866,27 @@ int main() {
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
 
-    // Draw spaceship: billboard triangle always facing the camera.
-    // Build vertices in world space using the camera's right and up axes.
+    // Draw spaceships: billboard triangles always facing the camera.
     {
       glm::vec3 cam_right = glm::vec3(view[0][0], view[1][0], view[2][0]);
       glm::vec3 cam_up = glm::vec3(view[0][1], view[1][1], view[2][1]);
       float s = cam.dist * 0.012f;
-      glm::vec3 v0 = g_ship.pos + s * (cam_up * 0.6f);
-      glm::vec3 v1 = g_ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
-      glm::vec3 v2 = g_ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
-      float sv[] = {
-          v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
-          0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
-      };
-      glBindVertexArray(g_ship.vao);
-      glBindBuffer(GL_ARRAY_BUFFER, g_ship.vbo);
-      glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
       glUniform1i(use_vc_loc, 1);
       glUniform1i(is_star_loc, 0);
       glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
-      glDrawArrays(GL_TRIANGLES, 0, 3);
+      for (auto &ship : g_ships) {
+        glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
+        glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
+        glm::vec3 v2 = ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
+        float sv[] = {
+            v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
+            0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
+        };
+        glBindVertexArray(ship.vao);
+        glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+      }
     }
 
     // FPS counter: update display value once per second
@@ -929,8 +926,10 @@ int main() {
     glDeleteVertexArrays(1, &pl.orbit_vao);
     glDeleteBuffers(1, &pl.orbit_vbo);
   }
-  glDeleteVertexArrays(1, &g_ship.vao);
-  glDeleteBuffers(1, &g_ship.vbo);
+  for (auto &ship : g_ships) {
+    glDeleteVertexArrays(1, &ship.vao);
+    glDeleteBuffers(1, &ship.vbo);
+  }
   glDeleteVertexArrays(1, &sun_vao);
   glDeleteBuffers(1, &sun_vbo);
   glDeleteVertexArrays(1, &axis_vao);
