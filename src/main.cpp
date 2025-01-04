@@ -886,6 +886,14 @@ int main() {
         glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
         glDrawArrays(GL_TRIANGLES, 0, 3);
+        // Outline: same verts, darker color, drawn as line loop
+        float ov[] = {
+            v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,  v1.z,
+            0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f, 0.45f, 0.40f,
+        };
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
+        glLineWidth(3.0f);
+        glDrawArrays(GL_LINE_LOOP, 0, 3);
       }
     }
 
