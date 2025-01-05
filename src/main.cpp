@@ -266,8 +266,11 @@ struct Planet {
 };
 static std::vector<Planet> g_planets;
 
+enum ShipShape { SHIP_TRIANGLE, SHIP_SQUARE };
+
 struct Spaceship {
   glm::vec3 pos;
+  ShipShape shape;
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -578,32 +581,44 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  {
-    static const glm::vec3 ship_positions[] = {
-        {0.00f, 0.00f, 0.00f},    {0.04f, 0.01f, 0.02f},
-        {-0.03f, 0.02f, -0.01f},  {0.02f, -0.03f, 0.04f},
-        {-0.01f, 0.04f, -0.03f},  {0.05f, 0.00f, -0.02f},
-        {-0.04f, -0.01f, 0.03f},  {0.01f, 0.03f, 0.05f},
-        {-0.02f, -0.04f, -0.04f}, {0.03f, 0.02f, -0.05f},
-        {-0.05f, 0.03f, 0.01f},
-    };
-    for (const auto &p : ship_positions) {
-      Spaceship s;
-      s.pos = p;
-      glGenVertexArrays(1, &s.vao);
-      glGenBuffers(1, &s.vbo);
-      glBindVertexArray(s.vao);
-      glBindBuffer(GL_ARRAY_BUFFER, s.vbo);
-      glBufferData(GL_ARRAY_BUFFER, 3 * 6 * sizeof(float), nullptr,
-                   GL_DYNAMIC_DRAW);
-      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                            (void *)0);
-      glEnableVertexAttribArray(0);
-      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
-                            (void *)(3 * sizeof(float)));
-      glEnableVertexAttribArray(1);
-      g_ships.push_back(s);
-    }
+  auto make_ship = [&](glm::vec3 pos, ShipShape shape) {
+    Spaceship s;
+    s.pos = pos;
+    s.shape = shape;
+    glGenVertexArrays(1, &s.vao);
+    glGenBuffers(1, &s.vbo);
+    glBindVertexArray(s.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, s.vbo);
+    glBufferData(GL_ARRAY_BUFFER, 6 * 6 * sizeof(float), nullptr,
+                 GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                          (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    g_ships.push_back(s);
+  };
+
+  // 11 triangle ships in a tight formation
+  static const glm::vec3 tri_positions[] = {
+      {0.00f, 0.00f, 0.00f},    {0.04f, 0.01f, 0.02f},
+      {-0.03f, 0.02f, -0.01f},  {0.02f, -0.03f, 0.04f},
+      {-0.01f, 0.04f, -0.03f},  {0.05f, 0.00f, -0.02f},
+      {-0.04f, -0.01f, 0.03f},  {0.01f, 0.03f, 0.05f},
+      {-0.02f, -0.04f, -0.04f}, {0.03f, 0.02f, -0.05f},
+      {-0.05f, 0.03f, 0.01f},
+  };
+  for (const auto &p : tri_positions)
+    make_ship(p, SHIP_TRIANGLE);
+
+  // 100 square ships scattered in a wider cloud around the formation
+  srand(555);
+  for (int i = 0; i < 100; i++) {
+    float x = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
+    float y = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
+    float z = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
+    make_ship({x, y, z}, SHIP_SQUARE);
   }
 
   // Stars: random points on a unit sphere, rendered with rotation-only view
@@ -875,25 +890,48 @@ int main() {
       glUniform1i(is_star_loc, 0);
       glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
       for (auto &ship : g_ships) {
-        glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
-        glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
-        glm::vec3 v2 = ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
-        float sv[] = {
-            v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
-            0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
-        };
         glBindVertexArray(ship.vao);
         glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        // Outline: same verts, darker color, drawn as line loop
-        float ov[] = {
-            v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,  v1.z,
-            0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f, 0.45f, 0.40f,
-        };
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
-        glLineWidth(3.0f);
-        glDrawArrays(GL_LINE_LOOP, 0, 3);
+        if (ship.shape == SHIP_TRIANGLE) {
+          glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
+          glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
+          glm::vec3 v2 = ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
+          float sv[] = {
+              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
+              0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
+          };
+          glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
+          glDrawArrays(GL_TRIANGLES, 0, 3);
+          float ov[] = {
+              v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,  v1.z,
+              0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f, 0.45f, 0.40f,
+          };
+          glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
+          glLineWidth(2.0f);
+          glDrawArrays(GL_LINE_LOOP, 0, 3);
+        } else {
+          float ss = s * 0.15f;
+          glm::vec3 v0 = ship.pos + ss * (-cam_right + cam_up);
+          glm::vec3 v1 = ship.pos + ss * (cam_right + cam_up);
+          glm::vec3 v2 = ship.pos + ss * (cam_right - cam_up);
+          glm::vec3 v3 = ship.pos + ss * (-cam_right - cam_up);
+          float sv[] = {
+              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
+              0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
+              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z,
+              0.2f, 1.0f, 0.9f, v3.x, v3.y, v3.z, 0.2f, 1.0f, 0.9f,
+          };
+          glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
+          glDrawArrays(GL_TRIANGLES, 0, 6);
+          float ov[] = {
+              v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,
+              v1.z,  0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f,
+              0.45f, 0.40f, v3.x,  v3.y,  v3.z,  0.05f, 0.45f, 0.40f,
+          };
+          glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
+          glLineWidth(2.0f);
+          glDrawArrays(GL_LINE_LOOP, 0, 4);
+        }
       }
     }
 
