@@ -337,6 +337,10 @@ static float target_pitch = cam.pitch;
 static bool mmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
+static bool g_lmb_down = false;
+static bool g_drag_active = false;
+static double g_drag_start_x = 0.0, g_drag_start_y = 0.0;
+static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
 static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
@@ -373,9 +377,22 @@ static void scroll_cb(GLFWwindow *, double, double dy) {
 static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
-  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-    g_pick_pending = true;
-    glfwGetCursorPos(win, &g_pick_x, &g_pick_y);
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+    if (action == GLFW_PRESS) {
+      g_lmb_down = true;
+      g_drag_active = false;
+      glfwGetCursorPos(win, &g_drag_start_x, &g_drag_start_y);
+      g_drag_cur_x = g_drag_start_x;
+      g_drag_cur_y = g_drag_start_y;
+    } else {
+      if (!g_drag_active) {
+        g_pick_pending = true;
+        g_pick_x = g_drag_start_x;
+        g_pick_y = g_drag_start_y;
+      }
+      g_lmb_down = false;
+      g_drag_active = false;
+    }
   }
 }
 
@@ -384,6 +401,15 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
   double dy = my - last_my;
   last_mx = mx;
   last_my = my;
+
+  if (g_lmb_down) {
+    g_drag_cur_x = mx;
+    g_drag_cur_y = my;
+    float ddx = (float)(mx - g_drag_start_x);
+    float ddy = (float)(my - g_drag_start_y);
+    if (sqrtf(ddx * ddx + ddy * ddy) > 5.0f)
+      g_drag_active = true;
+  }
 
   if (!mmb_down)
     return;
@@ -662,6 +688,20 @@ int main() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
+  // Drag selection box: 4 corners, updated dynamically each frame
+  GLuint drag_vao, drag_vbo;
+  glGenVertexArrays(1, &drag_vao);
+  glGenBuffers(1, &drag_vbo);
+  glBindVertexArray(drag_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, drag_vbo);
+  glBufferData(GL_ARRAY_BUFFER, 4 * 6 * sizeof(float), nullptr,
+               GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   double prev_time = glfwGetTime();
 
   while (!glfwWindowShouldClose(win)) {
@@ -935,6 +975,28 @@ int main() {
       }
     }
 
+    // Draw drag selection box
+    if (g_drag_active) {
+      float x0 = (float)g_drag_start_x, y0 = (float)g_drag_start_y;
+      float x1 = (float)g_drag_cur_x, y1 = (float)g_drag_cur_y;
+      float dv[] = {
+          x0, y0, 0.0f, 1.0f, 1.0f, 1.0f, x1, y0, 0.0f, 1.0f, 1.0f, 1.0f,
+          x1, y1, 0.0f, 1.0f, 1.0f, 1.0f, x0, y1, 0.0f, 1.0f, 1.0f, 1.0f,
+      };
+      glm::mat4 screen_mvp =
+          glm::ortho(0.0f, (float)w, (float)h, 0.0f, -1.0f, 1.0f);
+      glUseProgram(prog);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(screen_mvp));
+      glUniform1i(use_vc_loc, 1);
+      glUniform1i(is_star_loc, 0);
+      glUniform1f(point_size_loc, 1.0f);
+      glBindVertexArray(drag_vao);
+      glBindBuffer(GL_ARRAY_BUFFER, drag_vbo);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(dv), dv);
+      glLineWidth(1.0f);
+      glDrawArrays(GL_LINE_LOOP, 0, 4);
+    }
+
     // FPS counter: update display value once per second
     static int fps_frames = 0;
     static float fps_elapsed = 0.0f;
@@ -982,6 +1044,8 @@ int main() {
   glDeleteBuffers(1, &axis_vbo);
   glDeleteVertexArrays(1, &star_vao);
   glDeleteBuffers(1, &star_vbo);
+  glDeleteVertexArrays(1, &drag_vao);
+  glDeleteBuffers(1, &drag_vbo);
   glDeleteProgram(prog);
   glfwTerminate();
   return 0;
