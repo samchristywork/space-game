@@ -271,6 +271,7 @@ enum ShipShape { SHIP_TRIANGLE, SHIP_SQUARE };
 struct Spaceship {
   glm::vec3 pos;
   ShipShape shape;
+  bool selected = false;
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -339,6 +340,7 @@ static double last_mx = 0.0;
 static double last_my = 0.0;
 static bool g_lmb_down = false;
 static bool g_drag_active = false;
+static bool g_drag_select_pending = false;
 static double g_drag_start_x = 0.0, g_drag_start_y = 0.0;
 static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
@@ -389,6 +391,8 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
         g_pick_pending = true;
         g_pick_x = g_drag_start_x;
         g_pick_y = g_drag_start_y;
+      } else {
+        g_drag_select_pending = true;
       }
       g_lmb_down = false;
       g_drag_active = false;
@@ -806,6 +810,9 @@ int main() {
         printf("  Planets:  %d\n", n_planets);
         fflush(stdout);
       } else if (best_ship >= 0) {
+        for (auto &sh : g_ships)
+          sh.selected = false;
+        g_ships[best_ship].selected = true;
         const Spaceship &sh = g_ships[best_ship];
         printf("Spaceship %d\n", best_ship);
         printf("  Position: (%.3f, %.3f, %.3f)\n", sh.pos.x, sh.pos.y,
@@ -835,6 +842,30 @@ int main() {
         printf("  Orbit period: %.2f s\n", pl.orbit_period);
         printf("  Orbit tilt:   %.1f deg\n", glm::degrees(pl.orbit_tilt));
         fflush(stdout);
+      } else {
+        // Clicked empty space — deselect all
+        for (auto &sh : g_ships)
+          sh.selected = false;
+      }
+    }
+
+    // Drag selection: select ships whose screen position falls inside the box
+    if (g_drag_select_pending) {
+      g_drag_select_pending = false;
+      float bx0 = (float)fmin(g_drag_start_x, g_drag_cur_x);
+      float bx1 = (float)fmax(g_drag_start_x, g_drag_cur_x);
+      float by0 = (float)fmin(g_drag_start_y, g_drag_cur_y);
+      float by1 = (float)fmax(g_drag_start_y, g_drag_cur_y);
+      for (auto &sh : g_ships) {
+        glm::vec4 clip = proj * view * glm::vec4(sh.pos, 1.0f);
+        if (clip.w <= 0.0f) {
+          sh.selected = false;
+          continue;
+        }
+        glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        float sx = (ndc.x * 0.5f + 0.5f) * w;
+        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * h;
+        sh.selected = (sx >= bx0 && sx <= bx1 && sy >= by0 && sy <= by1);
       }
     }
 
@@ -932,19 +963,27 @@ int main() {
       for (auto &ship : g_ships) {
         glBindVertexArray(ship.vao);
         glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
+        // Selected: yellow fill / dark-yellow outline. Unselected: cyan /
+        // dark-teal.
+        float fr = ship.selected ? 1.00f : 0.20f;
+        float fg = ship.selected ? 1.00f : 1.00f;
+        float fb = ship.selected ? 0.30f : 0.90f;
+        float or_ = ship.selected ? 0.50f : 0.05f;
+        float og = ship.selected ? 0.50f : 0.45f;
+        float ob = ship.selected ? 0.10f : 0.40f;
         if (ship.shape == SHIP_TRIANGLE) {
           glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
           glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
           glm::vec3 v2 = ship.pos + s * (cam_right * 0.5f - cam_up * 0.3f);
           float sv[] = {
-              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
-              0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
+              v0.x, v0.y, v0.z, fr,   fg,   fb,   v1.x, v1.y, v1.z,
+              fr,   fg,   fb,   v2.x, v2.y, v2.z, fr,   fg,   fb,
           };
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
           glDrawArrays(GL_TRIANGLES, 0, 3);
           float ov[] = {
-              v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,  v1.z,
-              0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f, 0.45f, 0.40f,
+              v0.x, v0.y, v0.z, or_,  og,   ob,   v1.x, v1.y, v1.z,
+              or_,  og,   ob,   v2.x, v2.y, v2.z, or_,  og,   ob,
           };
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
           glLineWidth(2.0f);
@@ -956,17 +995,15 @@ int main() {
           glm::vec3 v2 = ship.pos + ss * (cam_right - cam_up);
           glm::vec3 v3 = ship.pos + ss * (-cam_right - cam_up);
           float sv[] = {
-              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v1.x, v1.y, v1.z,
-              0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z, 0.2f, 1.0f, 0.9f,
-              v0.x, v0.y, v0.z, 0.2f, 1.0f, 0.9f, v2.x, v2.y, v2.z,
-              0.2f, 1.0f, 0.9f, v3.x, v3.y, v3.z, 0.2f, 1.0f, 0.9f,
+              v0.x, v0.y, v0.z, fr, fg, fb, v1.x, v1.y, v1.z, fr, fg, fb,
+              v2.x, v2.y, v2.z, fr, fg, fb, v0.x, v0.y, v0.z, fr, fg, fb,
+              v2.x, v2.y, v2.z, fr, fg, fb, v3.x, v3.y, v3.z, fr, fg, fb,
           };
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(sv), sv);
           glDrawArrays(GL_TRIANGLES, 0, 6);
           float ov[] = {
-              v0.x,  v0.y,  v0.z,  0.05f, 0.45f, 0.40f, v1.x,  v1.y,
-              v1.z,  0.05f, 0.45f, 0.40f, v2.x,  v2.y,  v2.z,  0.05f,
-              0.45f, 0.40f, v3.x,  v3.y,  v3.z,  0.05f, 0.45f, 0.40f,
+              v0.x, v0.y, v0.z, or_, og, ob, v1.x, v1.y, v1.z, or_, og, ob,
+              v2.x, v2.y, v2.z, or_, og, ob, v3.x, v3.y, v3.z, or_, og, ob,
           };
           glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(ov), ov);
           glLineWidth(2.0f);
