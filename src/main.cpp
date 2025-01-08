@@ -361,6 +361,18 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
     break;
+  case GLFW_KEY_TAB: {
+    glm::vec3 sum(0.0f);
+    int count = 0;
+    for (const auto &sh : g_ships)
+      if (sh.selected) {
+        sum += sh.pos;
+        count++;
+      }
+    if (count > 0)
+      cam.target = sum / (float)count;
+    break;
+  }
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
     break;
