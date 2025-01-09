@@ -272,6 +272,8 @@ struct Spaceship {
   glm::vec3 pos;
   ShipShape shape;
   bool selected = false;
+  bool has_move_target = false;
+  glm::vec3 move_target{0.0f, 0.0f, 0.0f};
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -718,6 +720,20 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Move-order lines: 2 vertices per ship (ship pos → move target)
+  GLuint move_vao, move_vbo;
+  glGenVertexArrays(1, &move_vao);
+  glGenBuffers(1, &move_vbo);
+  glBindVertexArray(move_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, move_vbo);
+  glBufferData(GL_ARRAY_BUFFER, g_ships.size() * 2 * 6 * sizeof(float), nullptr,
+               GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   double prev_time = glfwGetTime();
 
   while (!glfwWindowShouldClose(win)) {
@@ -1024,6 +1040,33 @@ int main() {
       }
     }
 
+    // Draw move-order lines (ship -> assigned target)
+    {
+      std::vector<float> mv;
+      for (const auto &sh : g_ships) {
+        if (!sh.has_move_target)
+          continue;
+        // Tail at ship position
+        mv.insert(mv.end(), {sh.pos.x, sh.pos.y, sh.pos.z, 0.8f, 0.8f, 0.2f});
+        // Head at move target
+        mv.insert(mv.end(), {sh.move_target.x, sh.move_target.y,
+                             sh.move_target.z, 0.8f, 0.8f, 0.2f});
+      }
+      if (!mv.empty()) {
+        glUseProgram(prog);
+        glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
+        glUniform1i(use_vc_loc, 1);
+        glUniform1i(is_star_loc, 0);
+        glUniform1f(point_size_loc, 1.0f);
+        glBindVertexArray(move_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, move_vbo);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, mv.size() * sizeof(float),
+                        mv.data());
+        glLineWidth(1.0f);
+        glDrawArrays(GL_LINES, 0, (GLsizei)(mv.size() / 6));
+      }
+    }
+
     // Draw drag selection box
     if (g_drag_active) {
       float x0 = (float)g_drag_start_x, y0 = (float)g_drag_start_y;
@@ -1095,6 +1138,8 @@ int main() {
   glDeleteBuffers(1, &star_vbo);
   glDeleteVertexArrays(1, &drag_vao);
   glDeleteBuffers(1, &drag_vbo);
+  glDeleteVertexArrays(1, &move_vao);
+  glDeleteBuffers(1, &move_vbo);
   glDeleteProgram(prog);
   glfwTerminate();
   return 0;
