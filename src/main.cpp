@@ -391,6 +391,13 @@ static void scroll_cb(GLFWwindow *, double, double dy) {
 }
 
 static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
+  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    for (auto &sh : g_ships)
+      if (sh.selected) {
+        sh.has_move_target = true;
+        sh.move_target = cam.target;
+      }
+  }
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
