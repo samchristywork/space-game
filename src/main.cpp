@@ -392,11 +392,32 @@ static void scroll_cb(GLFWwindow *, double, double dy) {
 
 static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    std::vector<Spaceship *> sel;
     for (auto &sh : g_ships)
-      if (sh.selected) {
-        sh.has_move_target = true;
-        sh.move_target = cam.target;
+      if (sh.selected)
+        sel.push_back(&sh);
+    if (!sel.empty()) {
+      // Formation in the camera's right/up plane
+      float cx = cosf(cam.pitch) * sinf(cam.yaw);
+      float cy = sinf(cam.pitch);
+      float cz = cosf(cam.pitch) * cosf(cam.yaw);
+      glm::vec3 fwd = glm::normalize(glm::vec3(cx, cy, cz));
+      glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+      glm::vec3 up = glm::cross(right, fwd);
+      float spacing = cam.dist * 0.02f;
+
+      int idx = 0;
+      for (int ring = 0; idx < (int)sel.size(); ring++) {
+        int slots = (ring == 0) ? 1 : ring * 6;
+        for (int i = 0; i < slots && idx < (int)sel.size(); i++, idx++) {
+          float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
+          glm::vec3 offset =
+              (right * cosf(angle) + up * sinf(angle)) * (ring * spacing);
+          sel[idx]->has_move_target = true;
+          sel[idx]->move_target = cam.target + offset;
+        }
       }
+    }
   }
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
