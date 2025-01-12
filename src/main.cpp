@@ -772,6 +772,22 @@ int main() {
     float dt = (float)(now - prev_time);
     prev_time = now;
 
+    // Move ships toward their assigned targets
+    static constexpr float SHIP_SPEED = 0.4f;
+    for (auto &sh : g_ships) {
+      if (!sh.has_move_target)
+        continue;
+      glm::vec3 delta = sh.move_target - sh.pos;
+      float dist = glm::length(delta);
+      float step = SHIP_SPEED * dt;
+      if (dist <= step) {
+        sh.pos = sh.move_target;
+        sh.has_move_target = false;
+      } else {
+        sh.pos += (delta / dist) * step;
+      }
+    }
+
     // Smoothly interpolate camera toward target orientation
     const float speed = 8.0f;
     float dyaw = target_yaw - cam.yaw;
