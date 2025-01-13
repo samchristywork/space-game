@@ -332,6 +332,16 @@ struct Camera {
 };
 
 static Camera cam;
+
+enum FormationType {
+  FORMATION_HEX,
+  FORMATION_LINE,
+  FORMATION_WEDGE,
+  FORMATION_COUNT
+};
+static FormationType g_formation = FORMATION_HEX;
+static const char *FORMATION_NAMES[] = {"Hex", "Line", "Wedge"};
+
 static float g_timescale = 1.0f;
 static bool g_pick_pending = false;
 static double g_pick_x = 0.0, g_pick_y = 0.0;
@@ -375,6 +385,9 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
       cam.target = sum / (float)count;
     break;
   }
+  case GLFW_KEY_F:
+    g_formation = (FormationType)((g_formation + 1) % FORMATION_COUNT);
+    break;
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
     break;
@@ -397,7 +410,7 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
       if (sh.selected)
         sel.push_back(&sh);
     if (!sel.empty()) {
-      // Formation in the camera's right/up plane
+      // Compute camera right/up basis for all formation types
       float cx = cosf(cam.pitch) * sinf(cam.yaw);
       float cy = sinf(cam.pitch);
       float cz = cosf(cam.pitch) * cosf(cam.yaw);
@@ -405,16 +418,38 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
       glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
       glm::vec3 up = glm::cross(right, fwd);
       float spacing = cam.dist * 0.02f;
+      int n = (int)sel.size();
 
-      int idx = 0;
-      for (int ring = 0; idx < (int)sel.size(); ring++) {
-        int slots = (ring == 0) ? 1 : ring * 6;
-        for (int i = 0; i < slots && idx < (int)sel.size(); i++, idx++) {
-          float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
+      if (g_formation == FORMATION_HEX) {
+        int idx = 0;
+        for (int ring = 0; idx < n; ring++) {
+          int slots = (ring == 0) ? 1 : ring * 6;
+          for (int i = 0; i < slots && idx < n; i++, idx++) {
+            float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
+            glm::vec3 offset =
+                (right * cosf(angle) + up * sinf(angle)) * (ring * spacing);
+            sel[idx]->has_move_target = true;
+            sel[idx]->move_target = cam.target + offset;
+          }
+        }
+      } else if (g_formation == FORMATION_LINE) {
+        float total = (n - 1) * spacing;
+        for (int i = 0; i < n; i++) {
+          glm::vec3 offset = right * ((i * spacing) - total * 0.5f);
+          sel[i]->has_move_target = true;
+          sel[i]->move_target = cam.target + offset;
+        }
+      } else if (g_formation == FORMATION_WEDGE) {
+        // Leader at tip; pairs fan out behind along -up
+        sel[0]->has_move_target = true;
+        sel[0]->move_target = cam.target;
+        for (int i = 1; i < n; i++) {
+          int pair = (i + 1) / 2;
+          float side = (i % 2 == 1) ? 1.0f : -1.0f;
           glm::vec3 offset =
-              (right * cosf(angle) + up * sinf(angle)) * (ring * spacing);
-          sel[idx]->has_move_target = true;
-          sel[idx]->move_target = cam.target + offset;
+              right * (side * pair * spacing) - up * (pair * spacing);
+          sel[i]->has_move_target = true;
+          sel[i]->move_target = cam.target + offset;
         }
       }
     }
