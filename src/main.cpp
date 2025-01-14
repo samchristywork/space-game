@@ -1194,6 +1194,9 @@ int main() {
     text_draw(ts_buf, w - text_width(ts_buf) - 10.0f, 10.0f, {0.8f, 0.8f, 0.8f},
               w, h);
 
+    text_draw(FORMATION_NAMES[g_formation], 10.0f, h - 10.0f - g_font_size,
+              {0.8f, 0.8f, 0.2f}, w, h);
+
     glfwSwapBuffers(win);
     glfwPollEvents();
   }
