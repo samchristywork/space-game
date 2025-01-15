@@ -337,10 +337,11 @@ enum FormationType {
   FORMATION_HEX,
   FORMATION_LINE,
   FORMATION_WEDGE,
+  FORMATION_WALL,
   FORMATION_COUNT
 };
 static FormationType g_formation = FORMATION_HEX;
-static const char *FORMATION_NAMES[] = {"Hex", "Line", "Wedge"};
+static const char *FORMATION_NAMES[] = {"Hex", "Line", "Wedge", "Wall"};
 
 static float g_timescale = 1.0f;
 static bool g_pick_pending = false;
@@ -448,6 +449,18 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
           float side = (i % 2 == 1) ? 1.0f : -1.0f;
           glm::vec3 offset =
               right * (side * pair * spacing) - up * (pair * spacing);
+          sel[i]->has_move_target = true;
+          sel[i]->move_target = cam.target + offset;
+        }
+      } else if (g_formation == FORMATION_WALL) {
+        // 2D grid in the camera right/up plane
+        int cols = (int)ceilf(sqrtf((float)n));
+        int rows = (n + cols - 1) / cols;
+        for (int i = 0; i < n; i++) {
+          int col = i % cols;
+          int row = i / cols;
+          glm::vec3 offset = right * ((col - (cols - 1) * 0.5f) * spacing) +
+                             up * ((row - (rows - 1) * 0.5f) * spacing);
           sel[i]->has_move_target = true;
           sel[i]->move_target = cam.target + offset;
         }
