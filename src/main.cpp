@@ -339,10 +339,12 @@ enum FormationType {
   FORMATION_WEDGE,
   FORMATION_WALL,
   FORMATION_BOX,
+  FORMATION_SPHERE,
   FORMATION_COUNT
 };
 static FormationType g_formation = FORMATION_HEX;
-static const char *FORMATION_NAMES[] = {"Hex", "Line", "Wedge", "Wall", "Box"};
+static const char *FORMATION_NAMES[] = {"Hex",  "Line", "Wedge",
+                                        "Wall", "Box",  "Sphere"};
 
 static float g_timescale = 1.0f;
 static bool g_pick_pending = false;
@@ -477,6 +479,19 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
                              fwd * ((zi - (side - 1) * 0.5f) * spacing);
           sel[i]->has_move_target = true;
           sel[i]->move_target = cam.target + offset;
+        }
+      } else if (g_formation == FORMATION_SPHERE) {
+        // Fibonacci sphere: roughly even distribution on a sphere surface
+        float radius = spacing * sqrtf((float)n / (float)M_PI);
+        float golden = (float)M_PI * (3.0f - sqrtf(5.0f));
+        for (int i = 0; i < n; i++) {
+          float y = (n > 1) ? (1.0f - 2.0f * i / (n - 1)) : 0.0f;
+          float r = sqrtf(fmaxf(0.0f, 1.0f - y * y));
+          float theta = golden * i;
+          glm::vec3 dir =
+              right * (cosf(theta) * r) + up * y + fwd * (sinf(theta) * r);
+          sel[i]->has_move_target = true;
+          sel[i]->move_target = cam.target + dir * radius;
         }
       }
     }
