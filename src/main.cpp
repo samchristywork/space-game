@@ -390,7 +390,9 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     break;
   }
   case GLFW_KEY_F:
-    g_formation = (FormationType)((g_formation + 1) % FORMATION_COUNT);
+    g_formation =
+        (FormationType)((g_formation + (shift ? FORMATION_COUNT - 1 : 1)) %
+                        FORMATION_COUNT);
     break;
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
