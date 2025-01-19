@@ -352,6 +352,7 @@ static double g_pick_x = 0.0, g_pick_y = 0.0;
 static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
 static bool mmb_down = false;
+static bool g_rmb_down = false;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 static bool g_lmb_down = false;
@@ -498,6 +499,8 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
       }
     }
   }
+  if (button == GLFW_MOUSE_BUTTON_RIGHT)
+    g_rmb_down = (action == GLFW_PRESS);
   if (button == GLFW_MOUSE_BUTTON_MIDDLE)
     mmb_down = (action == GLFW_PRESS);
   if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -534,6 +537,25 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
     float ddy = (float)(my - g_drag_start_y);
     if (sqrtf(ddx * ddx + ddy * ddy) > 5.0f)
       g_drag_active = true;
+  }
+
+  if (g_rmb_down) {
+    // Rotate selected ships' move targets around cam.target
+    const float sensitivity = 0.005f;
+    float cx = cosf(cam.pitch) * sinf(cam.yaw);
+    float cy = sinf(cam.pitch);
+    float cz = cosf(cam.pitch) * cosf(cam.yaw);
+    glm::vec3 fwd = glm::normalize(glm::vec3(cx, cy, cz));
+    glm::vec3 cam_right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+    glm::vec3 cam_up = glm::cross(cam_right, fwd);
+    glm::mat4 rot = glm::rotate(glm::mat4(1.0f), (float)dx * sensitivity, cam_up) *
+                    glm::rotate(glm::mat4(1.0f), (float)dy * sensitivity, cam_right);
+    for (auto &sh : g_ships) {
+      if (!sh.selected || !sh.has_move_target)
+        continue;
+      glm::vec3 rel = sh.move_target - cam.target;
+      sh.move_target = cam.target + glm::vec3(rot * glm::vec4(rel, 0.0f));
+    }
   }
 
   if (!mmb_down)
