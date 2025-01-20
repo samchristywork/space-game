@@ -855,7 +855,7 @@ int main() {
   glGenBuffers(1, &move_vbo);
   glBindVertexArray(move_vao);
   glBindBuffer(GL_ARRAY_BUFFER, move_vbo);
-  glBufferData(GL_ARRAY_BUFFER, g_ships.size() * 2 * 6 * sizeof(float), nullptr,
+  glBufferData(GL_ARRAY_BUFFER, g_ships.size() * 10 * 6 * sizeof(float), nullptr,
                GL_DYNAMIC_DRAW);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
@@ -1125,10 +1125,11 @@ int main() {
     glLineWidth(2.0f);
     glDrawArrays(GL_LINES, 0, 6);
 
+    glm::vec3 cam_right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+    glm::vec3 cam_up = glm::vec3(view[0][1], view[1][1], view[2][1]);
+
     // Draw spaceships: billboard triangles always facing the camera.
     {
-      glm::vec3 cam_right = glm::vec3(view[0][0], view[1][0], view[2][0]);
-      glm::vec3 cam_up = glm::vec3(view[0][1], view[1][1], view[2][1]);
       float s = cam.dist * 0.012f;
       glUniform1i(use_vc_loc, 1);
       glUniform1i(is_star_loc, 0);
@@ -1185,17 +1186,29 @@ int main() {
       }
     }
 
-    // Draw move-order lines (ship -> assigned target)
+    // Draw move-order lines (ship -> assigned target) + diamond indicators
     {
-      std::vector<float> mv;
+      std::vector<float> mv;   // line vertices
+      std::vector<float> ind;  // indicator vertices
+
+      float is = cam.dist * 0.01f; // indicator half-size
       for (const auto &sh : g_ships) {
         if (!sh.has_move_target)
           continue;
-        // Tail at ship position
         mv.insert(mv.end(), {sh.pos.x, sh.pos.y, sh.pos.z, 0.8f, 0.8f, 0.2f});
-        // Head at move target
         mv.insert(mv.end(), {sh.move_target.x, sh.move_target.y,
                              sh.move_target.z, 0.8f, 0.8f, 0.2f});
+
+        // Diamond: top, right, bottom, left in camera plane
+        glm::vec3 t  = sh.move_target + cam_up    * is;
+        glm::vec3 r  = sh.move_target + cam_right * is;
+        glm::vec3 b  = sh.move_target - cam_up    * is;
+        glm::vec3 l  = sh.move_target - cam_right * is;
+        auto push = [&](glm::vec3 a, glm::vec3 b2) {
+          ind.insert(ind.end(), {a.x, a.y, a.z, 0.8f, 0.8f, 0.2f,
+                                 b2.x, b2.y, b2.z, 0.8f, 0.8f, 0.2f});
+        };
+        push(t, r); push(r, b); push(b, l); push(l, t);
       }
       if (!mv.empty()) {
         glUseProgram(prog);
@@ -1205,10 +1218,16 @@ int main() {
         glUniform1f(point_size_loc, 1.0f);
         glBindVertexArray(move_vao);
         glBindBuffer(GL_ARRAY_BUFFER, move_vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, mv.size() * sizeof(float),
-                        mv.data());
+        // Pack lines then indicators contiguously
+        size_t line_bytes = mv.size() * sizeof(float);
+        size_t ind_bytes  = ind.size() * sizeof(float);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, line_bytes, mv.data());
+        glBufferSubData(GL_ARRAY_BUFFER, line_bytes, ind_bytes, ind.data());
         glLineWidth(1.0f);
         glDrawArrays(GL_LINES, 0, (GLsizei)(mv.size() / 6));
+        glLineWidth(1.5f);
+        glDrawArrays(GL_LINES, (GLsizei)(mv.size() / 6),
+                     (GLsizei)(ind.size() / 6));
       }
     }
 
