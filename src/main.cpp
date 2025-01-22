@@ -342,7 +342,7 @@ enum FormationType {
   FORMATION_SPHERE,
   FORMATION_COUNT
 };
-static FormationType g_formation = FORMATION_HEX;
+static FormationType g_formation = FORMATION_SPHERE;
 static const char *FORMATION_NAMES[] = {"Hex",  "Line", "Wedge",
                                         "Wall", "Box",  "Sphere"};
 
