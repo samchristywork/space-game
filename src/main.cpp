@@ -881,7 +881,7 @@ int main() {
         continue;
       glm::vec3 delta = sh.move_target - sh.pos;
       float dist = glm::length(delta);
-      float step = SHIP_SPEED * dt;
+      float step = SHIP_SPEED * dt * g_timescale;
       if (dist <= step) {
         sh.pos = sh.move_target;
         sh.has_move_target = false;
