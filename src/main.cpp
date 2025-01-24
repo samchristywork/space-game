@@ -1196,9 +1196,10 @@ int main() {
       for (const auto &sh : g_ships) {
         if (!sh.has_move_target)
           continue;
-        mv.insert(mv.end(), {sh.pos.x, sh.pos.y, sh.pos.z, 0.8f, 0.8f, 0.2f});
+        mv.insert(mv.end(),
+                  {sh.pos.x, sh.pos.y, sh.pos.z, 0.25f, 0.25f, 0.06f});
         mv.insert(mv.end(), {sh.move_target.x, sh.move_target.y,
-                             sh.move_target.z, 0.8f, 0.8f, 0.2f});
+                             sh.move_target.z, 0.25f, 0.25f, 0.06f});
 
         // Diamond: top, right, bottom, left in camera plane
         glm::vec3 t = sh.move_target + cam_up * is;
