@@ -205,6 +205,7 @@ uniform vec3  u_color;
 uniform bool  u_use_vertex_color;
 uniform bool  u_is_star;
 uniform float u_glow_falloff;
+uniform float u_alpha;
 out vec4 color;
 void main() {
     vec3 c = u_use_vertex_color ? frag_color : u_color;
@@ -213,7 +214,7 @@ void main() {
         float a = exp(-d * u_glow_falloff);
         color = vec4(c * a, a);
     } else {
-        color = vec4(c, 1.0);
+        color = vec4(c, u_alpha);
     }
 }
 )";
@@ -633,6 +634,9 @@ int main() {
   GLint point_size_loc = glGetUniformLocation(prog, "u_point_size");
   GLint is_star_loc = glGetUniformLocation(prog, "u_is_star");
   GLint falloff_loc = glGetUniformLocation(prog, "u_glow_falloff");
+  GLint alpha_loc = glGetUniformLocation(prog, "u_alpha");
+  glUseProgram(prog);
+  glUniform1f(alpha_loc, 1.0f);
 
   // Star: a single point at the origin (pos + color, no color used directly)
   float sun_vert[] = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
@@ -1228,11 +1232,17 @@ int main() {
         size_t ind_bytes = ind.size() * sizeof(float);
         glBufferSubData(GL_ARRAY_BUFFER, 0, line_bytes, mv.data());
         glBufferSubData(GL_ARRAY_BUFFER, line_bytes, ind_bytes, ind.data());
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUniform1f(alpha_loc, 0.35f);
         glLineWidth(1.0f);
         glDrawArrays(GL_LINES, 0, (GLsizei)(mv.size() / 6));
+        glUniform1f(alpha_loc, 0.6f);
         glLineWidth(1.5f);
         glDrawArrays(GL_LINES, (GLsizei)(mv.size() / 6),
                      (GLsizei)(ind.size() / 6));
+        glUniform1f(alpha_loc, 1.0f);
+        glDisable(GL_BLEND);
       }
     }
 
