@@ -379,6 +379,10 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
     break;
+  case GLFW_KEY_A:
+    for (auto &sh : g_ships)
+      sh.selected = true;
+    break;
   case GLFW_KEY_TAB: {
     glm::vec3 sum(0.0f);
     int count = 0;
