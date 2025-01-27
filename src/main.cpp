@@ -341,11 +341,12 @@ enum FormationType {
   FORMATION_WALL,
   FORMATION_BOX,
   FORMATION_SPHERE,
+  FORMATION_RANDOM,
   FORMATION_COUNT
 };
 static FormationType g_formation = FORMATION_SPHERE;
-static const char *FORMATION_NAMES[] = {"Hex",  "Line", "Wedge",
-                                        "Wall", "Box",  "Sphere"};
+static const char *FORMATION_NAMES[] = {"Hex", "Line",   "Wedge", "Wall",
+                                        "Box", "Sphere", "Random"};
 
 static float g_timescale = 1.0f;
 static bool g_pick_pending = false;
@@ -500,6 +501,20 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
               right * (cosf(theta) * r) + up * y + fwd * (sinf(theta) * r);
           sel[i]->has_move_target = true;
           sel[i]->move_target = cam.target + dir * radius;
+        }
+      } else if (g_formation == FORMATION_RANDOM) {
+        float radius = spacing * sqrtf((float)n / (float)M_PI);
+        for (int i = 0; i < n; i++) {
+          // Rejection-sample a random point inside a sphere
+          glm::vec3 offset;
+          do {
+            float rx = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+            float ry = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+            float rz = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
+            offset = glm::vec3(rx, ry, rz) * radius;
+          } while (glm::length(offset) > radius);
+          sel[i]->has_move_target = true;
+          sel[i]->move_target = cam.target + offset;
         }
       }
     }
