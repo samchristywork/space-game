@@ -355,6 +355,7 @@ static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
 static bool mmb_down = false;
 static bool g_rmb_down = false;
+static std::vector<int> g_groups[10];
 static double last_mx = 0.0;
 static double last_my = 0.0;
 static bool g_lmb_down = false;
@@ -401,6 +402,26 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
         (FormationType)((g_formation + (shift ? FORMATION_COUNT - 1 : 1)) %
                         FORMATION_COUNT);
     break;
+  case GLFW_KEY_0:
+  case GLFW_KEY_1:
+  case GLFW_KEY_2:
+  case GLFW_KEY_3:
+  case GLFW_KEY_4:
+  case GLFW_KEY_5:
+  case GLFW_KEY_6:
+  case GLFW_KEY_7:
+  case GLFW_KEY_8:
+  case GLFW_KEY_9: {
+    int g = key - GLFW_KEY_0;
+    bool ctrl = (mods & GLFW_MOD_CONTROL) != 0;
+    if (ctrl) {
+      g_groups[g].clear();
+      for (int i = 0; i < (int)g_ships.size(); i++)
+        if (g_ships[i].selected)
+          g_groups[g].push_back(i);
+    }
+    break;
+  }
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
     break;
