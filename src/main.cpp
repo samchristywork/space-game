@@ -419,6 +419,11 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
       for (int i = 0; i < (int)g_ships.size(); i++)
         if (g_ships[i].selected)
           g_groups[g].push_back(i);
+    } else {
+      for (auto &sh : g_ships)
+        sh.selected = false;
+      for (int i : g_groups[g])
+        g_ships[i].selected = true;
     }
     break;
   }
