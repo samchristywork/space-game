@@ -356,6 +356,8 @@ static float target_pitch = cam.pitch;
 static bool mmb_down = false;
 static bool g_rmb_down = false;
 static std::vector<int> g_groups[10];
+static int g_last_group_key = -1;
+static double g_last_group_time = -1.0;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 static bool g_lmb_down = false;
@@ -419,11 +421,25 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
       for (int i = 0; i < (int)g_ships.size(); i++)
         if (g_ships[i].selected)
           g_groups[g].push_back(i);
+      g_last_group_key = -1;
     } else {
-      for (auto &sh : g_ships)
-        sh.selected = false;
-      for (int i : g_groups[g])
-        g_ships[i].selected = true;
+      double now = glfwGetTime();
+      if (g == g_last_group_key && (now - g_last_group_time) < 0.3) {
+        // Double-press: move 3D cursor to average position of the group
+        glm::vec3 sum(0.0f);
+        for (int i : g_groups[g])
+          sum += g_ships[i].pos;
+        if (!g_groups[g].empty())
+          cam.target = sum / (float)g_groups[g].size();
+        g_last_group_key = -1;
+      } else {
+        for (auto &sh : g_ships)
+          sh.selected = false;
+        for (int i : g_groups[g])
+          g_ships[i].selected = true;
+        g_last_group_key = g;
+        g_last_group_time = now;
+      }
     }
     break;
   }
