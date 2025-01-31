@@ -360,6 +360,7 @@ static int g_last_group_key = -1;
 static double g_last_group_time = -1.0;
 static double last_mx = 0.0;
 static double last_my = 0.0;
+static bool g_follow_mode = false;
 static bool g_lmb_down = false;
 static bool g_drag_active = false;
 static bool g_drag_select_pending = false;
@@ -382,6 +383,9 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   case GLFW_KEY_Z:
     target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
+    break;
+  case GLFW_KEY_GRAVE_ACCENT:
+    g_follow_mode = !g_follow_mode;
     break;
   case GLFW_KEY_A:
     for (auto &sh : g_ships)
@@ -955,6 +959,19 @@ int main() {
       }
     }
 
+    // Follow mode: keep 3D cursor at average position of selected ships
+    if (g_follow_mode) {
+      glm::vec3 sum(0.0f);
+      int count = 0;
+      for (const auto &sh : g_ships)
+        if (sh.selected) {
+          sum += sh.pos;
+          count++;
+        }
+      if (count > 0)
+        cam.target = sum / (float)count;
+    }
+
     // Smoothly interpolate camera toward target orientation
     const float speed = 8.0f;
     float dyaw = target_yaw - cam.yaw;
@@ -1357,6 +1374,9 @@ int main() {
 
     text_draw(FORMATION_NAMES[g_formation], 10.0f, h - 10.0f - g_font_size,
               {0.8f, 0.8f, 0.2f}, w, h);
+    if (g_follow_mode)
+      text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 2,
+                {0.3f, 0.9f, 1.0f}, w, h);
 
     glfwSwapBuffers(win);
     glfwPollEvents();
