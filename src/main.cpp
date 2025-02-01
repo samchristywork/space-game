@@ -633,6 +633,7 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
 
   if (shift) {
     // Pan: move target in camera-local right/up plane
+    g_follow_mode = false;
     float x = cosf(cam.pitch) * sinf(cam.yaw);
     float y = sinf(cam.pitch);
     float z = cosf(cam.pitch) * cosf(cam.yaw);
