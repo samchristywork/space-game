@@ -903,6 +903,48 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Milky Way: dense band of faint glowing points around a galactic plane
+  static constexpr int NUM_MW = 6000;
+  // Galactic basis: pole and two in-plane axes
+  glm::vec3 gal_pole = glm::normalize(glm::vec3(0.2f, 0.85f, 0.5f));
+  glm::vec3 gal_x = glm::normalize(glm::cross(gal_pole, glm::vec3(1, 0, 0)));
+  glm::vec3 gal_y = glm::cross(gal_pole, gal_x);
+  glm::vec3 gal_center = glm::normalize(glm::vec3(0.8f, -0.3f, 0.5f));
+
+  std::vector<float> mw_verts;
+  mw_verts.reserve(NUM_MW * 6);
+  srand(9999);
+  for (int i = 0; i < NUM_MW; i++) {
+    float phi = (rand() / (float)RAND_MAX) * 2.0f * (float)M_PI;
+    // Box-Muller Gaussian for latitude offset from galactic plane
+    float u1 = rand() / (float)RAND_MAX + 1e-6f;
+    float u2 = rand() / (float)RAND_MAX;
+    float lat = sqrtf(-2.0f * logf(u1)) * cosf(2.0f * (float)M_PI * u2) *
+                glm::radians(12.0f);
+    float cl = cosf(lat), sl = sinf(lat);
+    glm::vec3 dir = glm::normalize(
+        cl * (cosf(phi) * gal_x + sinf(phi) * gal_y) + sl * gal_pole);
+    // Brighter toward the galactic center
+    float toward_center = 0.5f + 0.5f * glm::dot(dir, gal_center);
+    float b = (0.004f + 0.016f * toward_center) *
+              powf(rand() / (float)RAND_MAX, 1.2f);
+    mw_verts.insert(mw_verts.end(),
+                    {dir.x, dir.y, dir.z, b * 0.75f, b * 0.85f, b});
+  }
+
+  GLuint mw_vao, mw_vbo;
+  glGenVertexArrays(1, &mw_vao);
+  glGenBuffers(1, &mw_vbo);
+  glBindVertexArray(mw_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, mw_vbo);
+  glBufferData(GL_ARRAY_BUFFER, mw_verts.size() * sizeof(float),
+               mw_verts.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
@@ -1132,9 +1174,25 @@ int main() {
     glUseProgram(prog);
     glUniform1f(point_size_loc, 1.0f);
 
+    // Draw Milky Way band (before background stars, additive glow)
+    glDepthMask(GL_FALSE);
+    glUniform1i(use_vc_loc, 1);
+    glUniform1i(is_star_loc, 1);
+    glUniform1f(point_size_loc, 120.0f);
+    glUniform1f(falloff_loc, 1.0f);
+    glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(proj * view_rot));
+    glBindVertexArray(mw_vao);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glDrawArrays(GL_POINTS, 0, NUM_MW);
+    glDisable(GL_BLEND);
+    glUniform1i(is_star_loc, 0);
+    glDepthMask(GL_TRUE);
+
     // Draw stars (depth writes off so they're always behind everything)
     glDepthMask(GL_FALSE);
     glUniform1i(use_vc_loc, 1);
+    glUniform1f(point_size_loc, 1.0f);
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(proj * view_rot));
     glBindVertexArray(star_vao);
     glDrawArrays(GL_POINTS, 0, NUM_STARS);
@@ -1400,6 +1458,8 @@ int main() {
   glDeleteBuffers(1, &axis_vbo);
   glDeleteVertexArrays(1, &star_vao);
   glDeleteBuffers(1, &star_vbo);
+  glDeleteVertexArrays(1, &mw_vao);
+  glDeleteBuffers(1, &mw_vbo);
   glDeleteVertexArrays(1, &drag_vao);
   glDeleteBuffers(1, &drag_vbo);
   glDeleteVertexArrays(1, &move_vao);
