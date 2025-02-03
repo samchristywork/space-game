@@ -367,7 +367,9 @@ static bool g_drag_select_pending = false;
 static double g_drag_start_x = 0.0, g_drag_start_y = 0.0;
 static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
-static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
+static bool g_uncapped = false;
+
+static void key_cb(GLFWwindow *win, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
     return;
   bool shift = (mods & GLFW_MOD_SHIFT) != 0;
@@ -386,6 +388,10 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     break;
   case GLFW_KEY_GRAVE_ACCENT:
     g_follow_mode = !g_follow_mode;
+    break;
+  case GLFW_KEY_U:
+    g_uncapped = !g_uncapped;
+    glfwSwapInterval(g_uncapped ? 0 : 1);
     break;
   case GLFW_KEY_A:
     for (auto &sh : g_ships)
