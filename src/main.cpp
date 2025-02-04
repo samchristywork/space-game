@@ -369,7 +369,7 @@ static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
 static bool g_uncapped = false;
 
-static void key_cb(GLFWwindow *win, int key, int, int action, int mods) {
+static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
     return;
   bool shift = (mods & GLFW_MOD_SHIFT) != 0;
