@@ -1417,7 +1417,7 @@ int main() {
     static int fps_display = 0;
     fps_frames++;
     fps_elapsed += dt;
-    if (fps_elapsed >= 1.0f) {
+    if (fps_elapsed >= 0.1f) {
       fps_display = (int)(fps_frames / fps_elapsed + 0.5f);
       fps_frames = 0;
       fps_elapsed = 0.0f;
