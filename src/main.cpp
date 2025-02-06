@@ -664,7 +664,10 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
   }
 }
 
-int main() {
+int main(int argc, char **argv) {
+  for (int i = 1; i < argc; i++)
+    if (strcmp(argv[i], "--uncap-framerate") == 0)
+      g_uncapped = true;
   if (!glfwInit()) {
     fprintf(stderr, "Failed to init GLFW\n");
     return 1;
@@ -682,7 +685,7 @@ int main() {
   }
 
   glfwMakeContextCurrent(win);
-  glfwSwapInterval(1);
+  glfwSwapInterval(g_uncapped ? 0 : 1);
   glfwSetKeyCallback(win, key_cb);
   glfwSetMouseButtonCallback(win, mouse_button_cb);
   glfwSetCursorPosCallback(win, cursor_pos_cb);
