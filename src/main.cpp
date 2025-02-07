@@ -665,9 +665,13 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
 }
 
 int main(int argc, char **argv) {
-  for (int i = 1; i < argc; i++)
+  bool fullscreen = false;
+  for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--uncap-framerate") == 0)
       g_uncapped = true;
+    if (strcmp(argv[i], "--fullscreen") == 0)
+      fullscreen = true;
+  }
   if (!glfwInit()) {
     fprintf(stderr, "Failed to init GLFW\n");
     return 1;
@@ -677,7 +681,15 @@ int main(int argc, char **argv) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *win = glfwCreateWindow(800, 600, "Space Game", nullptr, nullptr);
+  GLFWmonitor *monitor = fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+  int win_w = 800, win_h = 600;
+  if (fullscreen) {
+    const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+    win_w = mode->width;
+    win_h = mode->height;
+  }
+  GLFWwindow *win =
+      glfwCreateWindow(win_w, win_h, "Space Game", monitor, nullptr);
   if (!win) {
     fprintf(stderr, "Failed to create window\n");
     glfwTerminate();
