@@ -671,6 +671,14 @@ int main(int argc, char **argv) {
       g_uncapped = true;
     if (strcmp(argv[i], "--fullscreen") == 0)
       fullscreen = true;
+    if (strcmp(argv[i], "--help") == 0) {
+      printf("Usage: %s [options]\n"
+             "  --fullscreen        Start in fullscreen mode\n"
+             "  --uncap-framerate   Disable vsync\n"
+             "  --help              Show this help\n",
+             argv[0]);
+      return 0;
+    }
   }
   if (!glfwInit()) {
     fprintf(stderr, "Failed to init GLFW\n");
