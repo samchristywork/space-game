@@ -10,6 +10,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 static const char *text_vert_src = R"(
 #version 330 core
@@ -216,6 +218,28 @@ void main() {
     } else {
         color = vec4(c, u_alpha);
     }
+}
+)";
+
+static const char *img_vert_src = R"(
+#version 330 core
+layout(location = 0) in vec2 pos;
+layout(location = 1) in vec2 uv;
+uniform mat4 u_proj;
+out vec2 v_uv;
+void main() {
+    gl_Position = u_proj * vec4(pos, 0.0, 1.0);
+    v_uv = uv;
+}
+)";
+
+static const char *img_frag_src = R"(
+#version 330 core
+in vec2 v_uv;
+uniform sampler2D u_tex;
+out vec4 out_color;
+void main() {
+    out_color = texture(u_tex, v_uv);
 }
 )";
 
@@ -721,6 +745,43 @@ int main(int argc, char **argv) {
 
   text_init(18);
   g_text_prog = build_program(text_vert_src, text_frag_src);
+
+  // Load test-image.png
+  GLuint img_tex = 0;
+  int img_w = 0, img_h = 0;
+  {
+    int channels;
+    stbi_set_flip_vertically_on_load(1);
+    unsigned char *data =
+        stbi_load("test-image.png", &img_w, &img_h, &channels, 4);
+    if (data) {
+      glGenTextures(1, &img_tex);
+      glBindTexture(GL_TEXTURE_2D, img_tex);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img_w, img_h, 0, GL_RGBA,
+                   GL_UNSIGNED_BYTE, data);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      stbi_image_free(data);
+    } else {
+      fprintf(stderr, "Failed to load test-image.png: %s\n",
+              stbi_failure_reason());
+    }
+  }
+  GLuint img_prog = build_program(img_vert_src, img_frag_src);
+
+  // Quad VAO for image (6 verts: pos.xy + uv.xy)
+  GLuint img_vao, img_vbo;
+  glGenVertexArrays(1, &img_vao);
+  glGenBuffers(1, &img_vbo);
+  glBindVertexArray(img_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, img_vbo);
+  glBufferData(GL_ARRAY_BUFFER, 6 * 4 * sizeof(float), nullptr,
+               GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                        (void *)(2 * sizeof(float)));
+  glEnableVertexAttribArray(1);
 
   GLuint prog = build_program(vert_src, frag_src);
   GLint mvp_loc = glGetUniformLocation(prog, "mvp");
@@ -1466,6 +1527,32 @@ int main(int argc, char **argv) {
       text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 2,
                 {0.3f, 0.9f, 1.0f}, w, h);
 
+    // Draw test-image.png in the bottom right corner
+    if (img_tex && img_w > 0) {
+      float x0 = w - img_w, y0 = h - img_h;
+      float x1 = w, y1 = h;
+      float verts[] = {
+          x0, y0, 0.0f, 0.0f, x1, y0, 1.0f, 0.0f, x1, y1, 1.0f, 1.0f,
+          x0, y0, 0.0f, 0.0f, x1, y1, 1.0f, 1.0f, x0, y1, 0.0f, 1.0f,
+      };
+      glm::mat4 proj = glm::ortho(0.0f, (float)w, (float)h, 0.0f);
+      glUseProgram(img_prog);
+      glUniformMatrix4fv(glGetUniformLocation(img_prog, "u_proj"), 1, GL_FALSE,
+                         glm::value_ptr(proj));
+      glUniform1i(glGetUniformLocation(img_prog, "u_tex"), 0);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, img_tex);
+      glBindVertexArray(img_vao);
+      glBindBuffer(GL_ARRAY_BUFFER, img_vbo);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glDisable(GL_DEPTH_TEST);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+      glEnable(GL_DEPTH_TEST);
+      glDisable(GL_BLEND);
+    }
+
     glfwSwapBuffers(win);
     glfwPollEvents();
   }
@@ -1494,6 +1581,11 @@ int main(int argc, char **argv) {
   glDeleteVertexArrays(1, &move_vao);
   glDeleteBuffers(1, &move_vbo);
   glDeleteProgram(prog);
+  glDeleteProgram(img_prog);
+  glDeleteVertexArrays(1, &img_vao);
+  glDeleteBuffers(1, &img_vbo);
+  if (img_tex)
+    glDeleteTextures(1, &img_tex);
   glfwTerminate();
   return 0;
 }
