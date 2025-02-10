@@ -12,6 +12,8 @@
 #include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb/stb_image_write.h>
 
 static const char *text_vert_src = R"(
 #version 330 core
@@ -385,6 +387,7 @@ static double g_last_group_time = -1.0;
 static double last_mx = 0.0;
 static double last_my = 0.0;
 static bool g_follow_mode = false;
+static bool g_screenshot_pending = false;
 static bool g_lmb_down = false;
 static bool g_drag_active = false;
 static bool g_drag_select_pending = false;
@@ -409,6 +412,9 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   case GLFW_KEY_Z:
     target_yaw = glm::radians(shift ? 180.0f : 0.0f);
     target_pitch = 0.0f;
+    break;
+  case GLFW_KEY_F1:
+    g_screenshot_pending = true;
     break;
   case GLFW_KEY_GRAVE_ACCENT:
     g_follow_mode = !g_follow_mode;
@@ -1554,6 +1560,23 @@ int main(int argc, char **argv) {
     }
 
     glfwSwapBuffers(win);
+
+    if (g_screenshot_pending) {
+      g_screenshot_pending = false;
+      std::vector<unsigned char> pixels(w * h * 3);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+      // Flip vertically: OpenGL origin is bottom-left
+      stbi_flip_vertically_on_write(1);
+      static int shot_index = 0;
+      char filename[64];
+      snprintf(filename, sizeof(filename), "screenshot_%04d.png", ++shot_index);
+      if (stbi_write_png(filename, w, h, 3, pixels.data(), w * 3))
+        printf("Screenshot saved: %s\n", filename);
+      else
+        fprintf(stderr, "Failed to save screenshot\n");
+    }
+
     glfwPollEvents();
   }
 
