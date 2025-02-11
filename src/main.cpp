@@ -6,6 +6,7 @@
 #include <cstring>
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <ctime>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -1568,9 +1569,10 @@ int main(int argc, char **argv) {
       glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
       // Flip vertically: OpenGL origin is bottom-left
       stbi_flip_vertically_on_write(1);
-      static int shot_index = 0;
       char filename[64];
-      snprintf(filename, sizeof(filename), "screenshot_%04d.png", ++shot_index);
+      time_t t = time(nullptr);
+      struct tm *tm = localtime(&t);
+      strftime(filename, sizeof(filename), "screenshot_%Y%m%d_%H%M%S.png", tm);
       if (stbi_write_png(filename, w, h, 3, pixels.data(), w * 3))
         printf("Screenshot saved: %s\n", filename);
       else
