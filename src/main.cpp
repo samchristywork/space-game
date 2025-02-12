@@ -344,6 +344,18 @@ static const LocalStar LOCAL_STARS[] = {
     {{-7.0f, 1.5f, 3.0f}, {1.0f, 1.00f, 0.90f}},   // A – white
 };
 
+struct WormholePair {
+  glm::vec3 a, b;
+};
+
+static const WormholePair WORMHOLE_PAIRS[] = {
+    {{2.0f, 1.0f, 3.0f}, {-4.0f, -1.5f, -2.0f}},
+    {{-3.0f, 2.0f, 1.0f}, {5.0f, -2.0f, 4.0f}},
+    {{1.0f, -2.5f, -5.0f}, {-1.5f, 3.5f, 2.0f}},
+};
+static constexpr int NUM_WORMHOLE_PAIRS =
+    (int)(sizeof(WORMHOLE_PAIRS) / sizeof(WORMHOLE_PAIRS[0]));
+
 struct Camera {
   float yaw = 0.0f;
   float pitch = 0.3f;
@@ -1073,6 +1085,27 @@ int main(int argc, char **argv) {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
+  // Wormhole connector lines: 2 verts per pair (pos+color)
+  std::vector<float> wh_line_verts;
+  for (const auto &wp : WORMHOLE_PAIRS) {
+    wh_line_verts.insert(wh_line_verts.end(),
+                         {wp.a.x, wp.a.y, wp.a.z, 0.5f, 0.2f, 0.9f});
+    wh_line_verts.insert(wh_line_verts.end(),
+                         {wp.b.x, wp.b.y, wp.b.z, 0.5f, 0.2f, 0.9f});
+  }
+  GLuint wh_vao, wh_vbo;
+  glGenVertexArrays(1, &wh_vao);
+  glGenBuffers(1, &wh_vbo);
+  glBindVertexArray(wh_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, wh_vbo);
+  glBufferData(GL_ARRAY_BUFFER, wh_line_verts.size() * sizeof(float),
+               wh_line_verts.data(), GL_STATIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
   double prev_time = glfwGetTime();
 
   while (!glfwWindowShouldClose(win)) {
@@ -1328,6 +1361,50 @@ int main(int argc, char **argv) {
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
     glUniform1i(is_star_loc, 0);
+
+    // Draw wormholes: connector lines + two-layer glow per endpoint
+    {
+      // Connector lines
+      glUniform1i(use_vc_loc, 1);
+      glUniform1i(is_star_loc, 0);
+      glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
+      glUniform1f(alpha_loc, 0.4f);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glBindVertexArray(wh_vao);
+      glLineWidth(1.0f);
+      glDrawArrays(GL_LINES, 0, NUM_WORMHOLE_PAIRS * 2);
+      glDisable(GL_BLEND);
+      glUniform1f(alpha_loc, 1.0f);
+
+      // Glow layers for each endpoint
+      glUniform1i(use_vc_loc, 0);
+      glUniform1i(is_star_loc, 1);
+      glBindVertexArray(sun_vao);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+      glDepthMask(GL_FALSE);
+      for (const auto &wp : WORMHOLE_PAIRS) {
+        for (int e = 0; e < 2; e++) {
+          glm::vec3 p = (e == 0) ? wp.a : wp.b;
+          glm::mat4 wh_mvp = mvp * glm::translate(glm::mat4(1.0f), p);
+          glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(wh_mvp));
+          // Outer halo
+          glUniform1f(point_size_loc, 90.0f);
+          glUniform1f(falloff_loc, 3.5f);
+          glUniform3f(color_loc, 0.35f, 0.1f, 0.8f);
+          glDrawArrays(GL_POINTS, 0, 1);
+          // Inner core
+          glUniform1f(point_size_loc, 28.0f);
+          glUniform1f(falloff_loc, 7.0f);
+          glUniform3f(color_loc, 0.75f, 0.5f, 1.0f);
+          glDrawArrays(GL_POINTS, 0, 1);
+        }
+      }
+      glDepthMask(GL_TRUE);
+      glDisable(GL_BLEND);
+      glUniform1i(is_star_loc, 0);
+    }
 
     // Draw all planets and orbit lines
     glUniform1i(use_vc_loc, 1);
@@ -1601,6 +1678,8 @@ int main(int argc, char **argv) {
   glDeleteBuffers(1, &star_vbo);
   glDeleteVertexArrays(1, &mw_vao);
   glDeleteBuffers(1, &mw_vbo);
+  glDeleteVertexArrays(1, &wh_vao);
+  glDeleteBuffers(1, &wh_vbo);
   glDeleteVertexArrays(1, &drag_vao);
   glDeleteBuffers(1, &drag_vbo);
   glDeleteVertexArrays(1, &move_vao);
