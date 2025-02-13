@@ -302,6 +302,7 @@ struct Spaceship {
   bool selected = false;
   bool has_move_target = false;
   glm::vec3 move_target{0.0f, 0.0f, 0.0f};
+  std::vector<glm::vec3> waypoints;
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -511,6 +512,34 @@ static void scroll_cb(GLFWwindow *, double, double dy) {
     cam.dist = 0.01f;
 }
 
+// Checks all wormhole pairs for a shorter path than going direct.
+static std::vector<glm::vec3> compute_route(glm::vec3 from, glm::vec3 to) {
+  float best = glm::distance(from, to);
+  int best_wh = -1;
+  bool enter_a = true;
+  for (int i = 0; i < NUM_WORMHOLE_PAIRS; i++) {
+    float da = glm::distance(from, WORMHOLE_PAIRS[i].a) +
+               glm::distance(WORMHOLE_PAIRS[i].b, to);
+    float db = glm::distance(from, WORMHOLE_PAIRS[i].b) +
+               glm::distance(WORMHOLE_PAIRS[i].a, to);
+    if (da < best) {
+      best = da;
+      best_wh = i;
+      enter_a = true;
+    }
+    if (db < best) {
+      best = db;
+      best_wh = i;
+      enter_a = false;
+    }
+  }
+  std::vector<glm::vec3> route;
+  if (best_wh >= 0)
+    route.push_back(enter_a ? WORMHOLE_PAIRS[best_wh].a
+                            : WORMHOLE_PAIRS[best_wh].b);
+  return route;
+}
+
 static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
     std::vector<Spaceship *> sel;
@@ -518,6 +547,11 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
       if (sh.selected)
         sel.push_back(&sh);
     if (!sel.empty()) {
+      auto assign = [](Spaceship *sh, glm::vec3 target) {
+        sh->has_move_target = true;
+        sh->move_target = target;
+        sh->waypoints = compute_route(sh->pos, target);
+      };
       // Compute camera right/up basis for all formation types
       float cx = cosf(cam.pitch) * sinf(cam.yaw);
       float cy = sinf(cam.pitch);
@@ -536,56 +570,40 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
             float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
             glm::vec3 offset =
                 (right * cosf(angle) + up * sinf(angle)) * (ring * spacing);
-            sel[idx]->has_move_target = true;
-            sel[idx]->move_target = cam.target + offset;
+            assign(sel[idx], cam.target + offset);
           }
         }
       } else if (g_formation == FORMATION_LINE) {
         float total = (n - 1) * spacing;
-        for (int i = 0; i < n; i++) {
-          glm::vec3 offset = right * ((i * spacing) - total * 0.5f);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + offset;
-        }
+        for (int i = 0; i < n; i++)
+          assign(sel[i], cam.target + right * ((i * spacing) - total * 0.5f));
       } else if (g_formation == FORMATION_WEDGE) {
-        // Leader at tip; pairs fan out behind along -up
-        sel[0]->has_move_target = true;
-        sel[0]->move_target = cam.target;
+        assign(sel[0], cam.target);
         for (int i = 1; i < n; i++) {
           int pair = (i + 1) / 2;
           float side = (i % 2 == 1) ? 1.0f : -1.0f;
-          glm::vec3 offset =
-              right * (side * pair * spacing) - up * (pair * spacing);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + offset;
+          assign(sel[i], cam.target + right * (side * pair * spacing) -
+                             up * (pair * spacing));
         }
       } else if (g_formation == FORMATION_WALL) {
-        // 2D grid in the camera right/up plane
         int cols = (int)ceilf(sqrtf((float)n));
         int rows = (n + cols - 1) / cols;
         for (int i = 0; i < n; i++) {
-          int col = i % cols;
-          int row = i / cols;
-          glm::vec3 offset = right * ((col - (cols - 1) * 0.5f) * spacing) +
-                             up * ((row - (rows - 1) * 0.5f) * spacing);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + offset;
+          glm::vec3 offset =
+              right * ((i % cols - (cols - 1) * 0.5f) * spacing) +
+              up * ((i / cols - (rows - 1) * 0.5f) * spacing);
+          assign(sel[i], cam.target + offset);
         }
       } else if (g_formation == FORMATION_BOX) {
-        // 3D grid along right/up/fwd axes
         int side = (int)ceilf(cbrtf((float)n));
         for (int i = 0; i < n; i++) {
-          int xi = i % side;
-          int yi = (i / side) % side;
-          int zi = i / (side * side);
-          glm::vec3 offset = right * ((xi - (side - 1) * 0.5f) * spacing) +
-                             up * ((yi - (side - 1) * 0.5f) * spacing) +
-                             fwd * ((zi - (side - 1) * 0.5f) * spacing);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + offset;
+          glm::vec3 offset =
+              right * ((i % side - (side - 1) * 0.5f) * spacing) +
+              up * (((i / side) % side - (side - 1) * 0.5f) * spacing) +
+              fwd * ((i / (side * side) - (side - 1) * 0.5f) * spacing);
+          assign(sel[i], cam.target + offset);
         }
       } else if (g_formation == FORMATION_SPHERE) {
-        // Fibonacci sphere: roughly even distribution on a sphere surface
         float radius = spacing * sqrtf((float)n / (float)M_PI);
         float golden = (float)M_PI * (3.0f - sqrtf(5.0f));
         for (int i = 0; i < n; i++) {
@@ -594,13 +612,11 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
           float theta = golden * i;
           glm::vec3 dir =
               right * (cosf(theta) * r) + up * y + fwd * (sinf(theta) * r);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + dir * radius;
+          assign(sel[i], cam.target + dir * radius);
         }
       } else if (g_formation == FORMATION_RANDOM) {
         float radius = spacing * sqrtf((float)n / (float)M_PI);
         for (int i = 0; i < n; i++) {
-          // Rejection-sample a random point inside a sphere
           glm::vec3 offset;
           do {
             float rx = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
@@ -608,8 +624,7 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
             float rz = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
             offset = glm::vec3(rx, ry, rz) * radius;
           } while (glm::length(offset) > radius);
-          sel[i]->has_move_target = true;
-          sel[i]->move_target = cam.target + offset;
+          assign(sel[i], cam.target + offset);
         }
       }
     }
@@ -671,6 +686,7 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
         continue;
       glm::vec3 rel = sh.move_target - cam.target;
       sh.move_target = cam.target + glm::vec3(rot * glm::vec4(rel, 0.0f));
+      sh.waypoints.clear();
     }
   }
 
@@ -1116,17 +1132,35 @@ int main(int argc, char **argv) {
     float dt = (float)(now - prev_time);
     prev_time = now;
 
-    // Move ships toward their assigned targets
+    // Move ships toward their assigned targets (via waypoints if routed through
+    // wormhole)
     static constexpr float SHIP_SPEED = 0.4f;
     for (auto &sh : g_ships) {
       if (!sh.has_move_target)
         continue;
-      glm::vec3 delta = sh.move_target - sh.pos;
+      glm::vec3 dest =
+          sh.waypoints.empty() ? sh.move_target : sh.waypoints.front();
+      glm::vec3 delta = dest - sh.pos;
       float dist = glm::length(delta);
       float step = SHIP_SPEED * dt * g_timescale;
       if (dist <= step) {
-        sh.pos = sh.move_target;
-        sh.has_move_target = false;
+        sh.pos = dest;
+        if (!sh.waypoints.empty()) {
+          // Arrived at a waypoint — check for wormhole teleport then pop it
+          for (const auto &wp : WORMHOLE_PAIRS) {
+            if (glm::distance(sh.pos, wp.a) < 0.001f) {
+              sh.pos = wp.b;
+              break;
+            }
+            if (glm::distance(sh.pos, wp.b) < 0.001f) {
+              sh.pos = wp.a;
+              break;
+            }
+          }
+          sh.waypoints.erase(sh.waypoints.begin());
+        } else {
+          sh.has_move_target = false;
+        }
       } else {
         sh.pos += (delta / dist) * step;
       }
@@ -1511,8 +1545,14 @@ int main(int argc, char **argv) {
       for (const auto &sh : g_ships) {
         if (!sh.has_move_target)
           continue;
-        mv.insert(mv.end(),
-                  {sh.pos.x, sh.pos.y, sh.pos.z, 0.25f, 0.25f, 0.06f});
+        // Draw route: ship -> each waypoint -> final target
+        glm::vec3 prev = sh.pos;
+        for (const auto &wp : sh.waypoints) {
+          mv.insert(mv.end(), {prev.x, prev.y, prev.z, 0.25f, 0.25f, 0.06f});
+          mv.insert(mv.end(), {wp.x, wp.y, wp.z, 0.25f, 0.25f, 0.06f});
+          prev = wp;
+        }
+        mv.insert(mv.end(), {prev.x, prev.y, prev.z, 0.25f, 0.25f, 0.06f});
         mv.insert(mv.end(), {sh.move_target.x, sh.move_target.y,
                              sh.move_target.z, 0.25f, 0.25f, 0.06f});
 
