@@ -302,7 +302,9 @@ struct Spaceship {
   bool selected = false;
   bool has_move_target = false;
   glm::vec3 move_target{0.0f, 0.0f, 0.0f};
-  std::vector<glm::vec3> waypoints;
+  std::vector<glm::vec3> waypoints; // wormhole stops for current leg
+  std::vector<glm::vec3>
+      pending_targets; // user-queued destinations after move_target
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -540,17 +542,23 @@ static std::vector<glm::vec3> compute_route(glm::vec3 from, glm::vec3 to) {
   return route;
 }
 
-static void mouse_button_cb(GLFWwindow *win, int button, int action, int) {
+static void mouse_button_cb(GLFWwindow *win, int button, int action, int mods) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    bool shift = (mods & GLFW_MOD_SHIFT) != 0;
     std::vector<Spaceship *> sel;
     for (auto &sh : g_ships)
       if (sh.selected)
         sel.push_back(&sh);
     if (!sel.empty()) {
-      auto assign = [](Spaceship *sh, glm::vec3 target) {
-        sh->has_move_target = true;
-        sh->move_target = target;
-        sh->waypoints = compute_route(sh->pos, target);
+      auto assign = [shift](Spaceship *sh, glm::vec3 target) {
+        if (shift && sh->has_move_target) {
+          sh->pending_targets.push_back(target);
+        } else {
+          sh->pending_targets.clear();
+          sh->has_move_target = true;
+          sh->move_target = target;
+          sh->waypoints = compute_route(sh->pos, target);
+        }
       };
       // Compute camera right/up basis for all formation types
       float cx = cosf(cam.pitch) * sinf(cam.yaw);
@@ -1158,6 +1166,12 @@ int main(int argc, char **argv) {
             }
           }
           sh.waypoints.erase(sh.waypoints.begin());
+        } else if (!sh.pending_targets.empty()) {
+          // Start next queued leg
+          glm::vec3 next = sh.pending_targets.front();
+          sh.pending_targets.erase(sh.pending_targets.begin());
+          sh.move_target = next;
+          sh.waypoints = compute_route(sh.pos, next);
         } else {
           sh.has_move_target = false;
         }
@@ -1545,30 +1559,36 @@ int main(int argc, char **argv) {
       for (const auto &sh : g_ships) {
         if (!sh.has_move_target)
           continue;
-        // Draw route: ship -> each waypoint -> final target
+        // Draw route: ship -> wormhole stops -> move_target -> pending queue
+        auto push_line = [&](glm::vec3 a, glm::vec3 b2) {
+          mv.insert(mv.end(), {a.x, a.y, a.z, 0.25f, 0.25f, 0.06f});
+          mv.insert(mv.end(), {b2.x, b2.y, b2.z, 0.25f, 0.25f, 0.06f});
+        };
+        auto push_diamond = [&](glm::vec3 p) {
+          glm::vec3 t = p + cam_up * is, r = p + cam_right * is;
+          glm::vec3 b = p - cam_up * is, l = p - cam_right * is;
+          ind.insert(ind.end(), {t.x, t.y, t.z, 0.3f, 0.9f, 1.0f, r.x, r.y, r.z,
+                                 0.3f, 0.9f, 1.0f});
+          ind.insert(ind.end(), {r.x, r.y, r.z, 0.3f, 0.9f, 1.0f, b.x, b.y, b.z,
+                                 0.3f, 0.9f, 1.0f});
+          ind.insert(ind.end(), {b.x, b.y, b.z, 0.3f, 0.9f, 1.0f, l.x, l.y, l.z,
+                                 0.3f, 0.9f, 1.0f});
+          ind.insert(ind.end(), {l.x, l.y, l.z, 0.3f, 0.9f, 1.0f, t.x, t.y, t.z,
+                                 0.3f, 0.9f, 1.0f});
+        };
         glm::vec3 prev = sh.pos;
         for (const auto &wp : sh.waypoints) {
-          mv.insert(mv.end(), {prev.x, prev.y, prev.z, 0.25f, 0.25f, 0.06f});
-          mv.insert(mv.end(), {wp.x, wp.y, wp.z, 0.25f, 0.25f, 0.06f});
+          push_line(prev, wp);
           prev = wp;
         }
-        mv.insert(mv.end(), {prev.x, prev.y, prev.z, 0.25f, 0.25f, 0.06f});
-        mv.insert(mv.end(), {sh.move_target.x, sh.move_target.y,
-                             sh.move_target.z, 0.25f, 0.25f, 0.06f});
-
-        // Diamond: top, right, bottom, left in camera plane
-        glm::vec3 t = sh.move_target + cam_up * is;
-        glm::vec3 r = sh.move_target + cam_right * is;
-        glm::vec3 b = sh.move_target - cam_up * is;
-        glm::vec3 l = sh.move_target - cam_right * is;
-        auto push = [&](glm::vec3 a, glm::vec3 b2) {
-          ind.insert(ind.end(), {a.x, a.y, a.z, 0.3f, 0.9f, 1.0f, b2.x, b2.y,
-                                 b2.z, 0.3f, 0.9f, 1.0f});
-        };
-        push(t, r);
-        push(r, b);
-        push(b, l);
-        push(l, t);
+        push_line(prev, sh.move_target);
+        push_diamond(sh.move_target);
+        prev = sh.move_target;
+        for (const auto &pt : sh.pending_targets) {
+          push_line(prev, pt);
+          push_diamond(pt);
+          prev = pt;
+        }
       }
       if (!mv.empty()) {
         glUseProgram(prog);
