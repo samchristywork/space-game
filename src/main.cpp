@@ -411,6 +411,7 @@ static double g_drag_start_x = 0.0, g_drag_start_y = 0.0;
 static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
 static bool g_uncapped = false;
+static bool g_paused = false;
 
 static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
@@ -499,6 +500,9 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
     }
     break;
   }
+  case GLFW_KEY_P:
+    g_paused = !g_paused;
+    break;
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
     break;
@@ -1140,43 +1144,45 @@ int main(int argc, char **argv) {
     float dt = (float)(now - prev_time);
     prev_time = now;
 
-    // Move ships toward their assigned targets (via waypoints if routed through
-    // wormhole)
-    static constexpr float SHIP_SPEED = 0.4f;
-    for (auto &sh : g_ships) {
-      if (!sh.has_move_target)
-        continue;
-      glm::vec3 dest =
-          sh.waypoints.empty() ? sh.move_target : sh.waypoints.front();
-      glm::vec3 delta = dest - sh.pos;
-      float dist = glm::length(delta);
-      float step = SHIP_SPEED * dt * g_timescale;
-      if (dist <= step) {
-        sh.pos = dest;
-        if (!sh.waypoints.empty()) {
-          // Arrived at a waypoint — check for wormhole teleport then pop it
-          for (const auto &wp : WORMHOLE_PAIRS) {
-            if (glm::distance(sh.pos, wp.a) < 0.001f) {
-              sh.pos = wp.b;
-              break;
+    if (!g_paused) {
+      // Move ships toward their assigned targets (via waypoints if routed
+      // through wormhole)
+      static constexpr float SHIP_SPEED = 0.4f;
+      for (auto &sh : g_ships) {
+        if (!sh.has_move_target)
+          continue;
+        glm::vec3 dest =
+            sh.waypoints.empty() ? sh.move_target : sh.waypoints.front();
+        glm::vec3 delta = dest - sh.pos;
+        float dist = glm::length(delta);
+        float step = SHIP_SPEED * dt * g_timescale;
+        if (dist <= step) {
+          sh.pos = dest;
+          if (!sh.waypoints.empty()) {
+            // Arrived at a waypoint — check for wormhole teleport then pop it
+            for (const auto &wp : WORMHOLE_PAIRS) {
+              if (glm::distance(sh.pos, wp.a) < 0.001f) {
+                sh.pos = wp.b;
+                break;
+              }
+              if (glm::distance(sh.pos, wp.b) < 0.001f) {
+                sh.pos = wp.a;
+                break;
+              }
             }
-            if (glm::distance(sh.pos, wp.b) < 0.001f) {
-              sh.pos = wp.a;
-              break;
-            }
+            sh.waypoints.erase(sh.waypoints.begin());
+          } else if (!sh.pending_targets.empty()) {
+            // Start next queued leg
+            glm::vec3 next = sh.pending_targets.front();
+            sh.pending_targets.erase(sh.pending_targets.begin());
+            sh.move_target = next;
+            sh.waypoints = compute_route(sh.pos, next);
+          } else {
+            sh.has_move_target = false;
           }
-          sh.waypoints.erase(sh.waypoints.begin());
-        } else if (!sh.pending_targets.empty()) {
-          // Start next queued leg
-          glm::vec3 next = sh.pending_targets.front();
-          sh.pending_targets.erase(sh.pending_targets.begin());
-          sh.move_target = next;
-          sh.waypoints = compute_route(sh.pos, next);
         } else {
-          sh.has_move_target = false;
+          sh.pos += (delta / dist) * step;
         }
-      } else {
-        sh.pos += (delta / dist) * step;
       }
     }
 
@@ -1459,7 +1465,8 @@ int main(int argc, char **argv) {
     glUniform1i(is_star_loc, 0);
     for (auto &pl : g_planets) {
       pl.orbit_angle +=
-          dt * g_timescale * (2.0f * (float)M_PI / pl.orbit_period);
+          g_paused ? 0.0f
+                   : dt * g_timescale * (2.0f * (float)M_PI / pl.orbit_period);
       pl.orbit_angle = fmodf(pl.orbit_angle, 2.0f * (float)M_PI);
       glm::vec3 pos =
           pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
@@ -1660,10 +1667,16 @@ int main(int argc, char **argv) {
     text_draw(pos_buf, 10.0f, 10.0f + g_font_size + 4.0f, {0.7f, 0.7f, 0.7f}, w,
               h);
 
-    char ts_buf[32];
-    snprintf(ts_buf, sizeof(ts_buf), "%gx", g_timescale);
-    text_draw(ts_buf, w - text_width(ts_buf) - 10.0f, 10.0f, {0.8f, 0.8f, 0.8f},
-              w, h);
+    if (g_paused) {
+      const char *ps = "PAUSED";
+      text_draw(ps, w - text_width(ps) - 10.0f, 10.0f, {1.0f, 0.8f, 0.2f}, w,
+                h);
+    } else {
+      char ts_buf[32];
+      snprintf(ts_buf, sizeof(ts_buf), "%gx", g_timescale);
+      text_draw(ts_buf, w - text_width(ts_buf) - 10.0f, 10.0f,
+                {0.8f, 0.8f, 0.8f}, w, h);
+    }
 
     text_draw(FORMATION_NAMES[g_formation], 10.0f, h - 10.0f - g_font_size,
               {0.8f, 0.8f, 0.2f}, w, h);
