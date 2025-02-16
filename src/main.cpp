@@ -304,7 +304,8 @@ struct Spaceship {
   glm::vec3 move_target{0.0f, 0.0f, 0.0f};
   std::vector<glm::vec3> waypoints; // wormhole stops for current leg
   std::vector<glm::vec3>
-      pending_targets; // user-queued destinations after move_target
+      pending_targets;  // user-queued destinations after move_target
+  int formation_id = 0; // shared among ships in the same move order (0 = none)
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -554,6 +555,15 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int mods) {
       if (sh.selected)
         sel.push_back(&sh);
     if (!sel.empty()) {
+      // Generate a unique formation ID for this order batch (non-shift only)
+      static int s_next_fid = 1;
+      int fid = 0;
+      if (!shift) {
+        fid = s_next_fid++;
+        for (auto *sh : sel)
+          sh->formation_id = fid;
+      }
+      (void)fid;
       auto assign = [shift](Spaceship *sh, glm::vec3 target) {
         if (shift && sh->has_move_target) {
           sh->pending_targets.push_back(target);
@@ -1293,9 +1303,11 @@ int main(int argc, char **argv) {
         printf("  Planets:  %d\n", n_planets);
         fflush(stdout);
       } else if (best_ship >= 0) {
+        int fid = g_ships[best_ship].formation_id;
         for (auto &sh : g_ships)
-          sh.selected = false;
-        g_ships[best_ship].selected = true;
+          sh.selected = (fid != 0 && sh.formation_id == fid);
+        if (!g_ships[best_ship].selected)
+          g_ships[best_ship].selected = true;
         const Spaceship &sh = g_ships[best_ship];
         printf("Spaceship %d\n", best_ship);
         printf("  Position: (%.3f, %.3f, %.3f)\n", sh.pos.x, sh.pos.y,
