@@ -414,6 +414,17 @@ static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 static bool g_uncapped = false;
 static bool g_paused = false;
 
+enum HoverType {
+  HOVER_NONE,
+  HOVER_STAR,
+  HOVER_PLANET,
+  HOVER_SHIP,
+  HOVER_WORMHOLE
+};
+static HoverType g_hover_type = HOVER_NONE;
+static int g_hover_idx = -1;
+static int g_hover_wh_side = 0; // 0 = endpoint a, 1 = endpoint b
+
 static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
     return;
@@ -1228,6 +1239,70 @@ int main(int argc, char **argv) {
         glm::perspective(glm::radians(45.0f), (float)w / h, 0.1f, 1000.0f);
     glm::mat4 view = cam.view();
     glm::mat4 mvp = proj * view;
+
+    // Hover detection: find the closest object to the current cursor position
+    {
+      auto sdist = [&](glm::vec3 world) -> float {
+        glm::vec4 clip = proj * view * glm::vec4(world, 1.0f);
+        if (clip.w <= 0.0f)
+          return 1e9f;
+        glm::vec3 ndc = glm::vec3(clip) / clip.w;
+        float sx = (ndc.x * 0.5f + 0.5f) * w;
+        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * h;
+        float dx = (float)last_mx - sx, dy = (float)last_my - sy;
+        return sqrtf(dx * dx + dy * dy);
+      };
+      float best = 30.0f;
+      g_hover_type = HOVER_NONE;
+      g_hover_idx = -1;
+      for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+           i++) {
+        float d = sdist(LOCAL_STARS[i].pos);
+        if (d < best) {
+          best = d;
+          g_hover_type = HOVER_STAR;
+          g_hover_idx = i;
+        }
+      }
+      for (int i = 0; i < (int)g_planets.size(); i++) {
+        const Planet &pl = g_planets[i];
+        glm::vec3 pos =
+            pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_tilt) *
+                                        sinf(pl.orbit_angle),
+                                    pl.orbit_radius * sinf(pl.orbit_angle));
+        float d = sdist(pos);
+        if (d < best) {
+          best = d;
+          g_hover_type = HOVER_PLANET;
+          g_hover_idx = i;
+        }
+      }
+      for (int i = 0; i < (int)g_ships.size(); i++) {
+        float d = sdist(g_ships[i].pos);
+        if (d < best) {
+          best = d;
+          g_hover_type = HOVER_SHIP;
+          g_hover_idx = i;
+        }
+      }
+      for (int i = 0; i < NUM_WORMHOLE_PAIRS; i++) {
+        float da = sdist(WORMHOLE_PAIRS[i].a);
+        float db = sdist(WORMHOLE_PAIRS[i].b);
+        if (da < best) {
+          best = da;
+          g_hover_type = HOVER_WORMHOLE;
+          g_hover_idx = i;
+          g_hover_wh_side = 0;
+        }
+        if (db < best) {
+          best = db;
+          g_hover_type = HOVER_WORMHOLE;
+          g_hover_idx = i;
+          g_hover_wh_side = 1;
+        }
+      }
+    }
 
     // Picking: find the star or planet closest to a left-click
     if (g_pick_pending) {
