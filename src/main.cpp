@@ -1771,6 +1771,87 @@ int main(int argc, char **argv) {
       text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 2,
                 {0.3f, 0.9f, 1.0f}, w, h);
 
+    // Hover info panel — left side, vertically centered
+    if (g_hover_type != HOVER_NONE) {
+      static const char *spectral[] = {
+          "G (yellow)",       "B (blue-white)",   "M (red dwarf)",
+          "A (white)",        "K (orange)",       "O (hot blue)",
+          "F (yellow-white)", "K (orange giant)", "B (blue)",
+          "M (red)",          "A (white)",
+      };
+      char lines[8][80];
+      int nlines = 0;
+      float lh = g_font_size + 4.0f;
+
+      if (g_hover_type == HOVER_STAR) {
+        const LocalStar &s = LOCAL_STARS[g_hover_idx];
+        int np = 0;
+        for (const auto &pl : g_planets)
+          if (pl.star_pos == s.pos)
+            np++;
+        snprintf(lines[nlines++], 80, "Star %d", g_hover_idx);
+        snprintf(lines[nlines++], 80, "Type:     %s", spectral[g_hover_idx]);
+        snprintf(lines[nlines++], 80, "Pos:      %.2f  %.2f  %.2f", s.pos.x,
+                 s.pos.y, s.pos.z);
+        snprintf(lines[nlines++], 80, "Planets:  %d", np);
+      } else if (g_hover_type == HOVER_PLANET) {
+        const Planet &pl = g_planets[g_hover_idx];
+        int parent = -1;
+        for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+             i++)
+          if (LOCAL_STARS[i].pos == pl.star_pos) {
+            parent = i;
+            break;
+          }
+        const char *zone = pl.orbit_radius < 0.5f   ? "Rocky"
+                           : pl.orbit_radius < 1.1f ? "Gas giant"
+                                                    : "Ice giant";
+        snprintf(lines[nlines++], 80, "Planet %d  (Star %d)", g_hover_idx,
+                 parent);
+        snprintf(lines[nlines++], 80, "Zone:     %s", zone);
+        snprintf(lines[nlines++], 80, "Radius:   %.3f", pl.orbit_radius);
+        snprintf(lines[nlines++], 80, "Period:   %.2f s", pl.orbit_period);
+        snprintf(lines[nlines++], 80, "Tilt:     %.1f deg",
+                 glm::degrees(pl.orbit_tilt));
+      } else if (g_hover_type == HOVER_SHIP) {
+        const Spaceship &sh = g_ships[g_hover_idx];
+        snprintf(lines[nlines++], 80, "Ship %d", g_hover_idx);
+        snprintf(lines[nlines++], 80, "Pos:      %.2f  %.2f  %.2f", sh.pos.x,
+                 sh.pos.y, sh.pos.z);
+        snprintf(lines[nlines++], 80, "Selected: %s",
+                 sh.selected ? "yes" : "no");
+        if (sh.formation_id)
+          snprintf(lines[nlines++], 80, "Formation: %d", sh.formation_id);
+        if (sh.has_move_target)
+          snprintf(lines[nlines++], 80, "Target:   %.2f  %.2f  %.2f",
+                   sh.move_target.x, sh.move_target.y, sh.move_target.z);
+        if (!sh.pending_targets.empty())
+          snprintf(lines[nlines++], 80, "Waypoints: %d queued",
+                   (int)sh.pending_targets.size());
+      } else if (g_hover_type == HOVER_WORMHOLE) {
+        const WormholePair &wp = WORMHOLE_PAIRS[g_hover_idx];
+        const glm::vec3 &here = g_hover_wh_side == 0 ? wp.a : wp.b;
+        const glm::vec3 &there = g_hover_wh_side == 0 ? wp.b : wp.a;
+        snprintf(lines[nlines++], 80, "Wormhole %d%s", g_hover_idx,
+                 g_hover_wh_side == 0 ? "A" : "B");
+        snprintf(lines[nlines++], 80, "Pos:      %.2f  %.2f  %.2f", here.x,
+                 here.y, here.z);
+        snprintf(lines[nlines++], 80, "Exit:     %.2f  %.2f  %.2f", there.x,
+                 there.y, there.z);
+        float dist = glm::distance(wp.a, wp.b);
+        snprintf(lines[nlines++], 80, "Span:     %.2f", dist);
+      }
+
+      float total_h = nlines * lh;
+      float start_y = (h - total_h) * 0.5f;
+      glm::vec3 header_col = {1.0f, 1.0f, 1.0f};
+      glm::vec3 body_col = {0.7f, 0.7f, 0.7f};
+      for (int i = 0; i < nlines; i++) {
+        glm::vec3 col = (i == 0) ? header_col : body_col;
+        text_draw(lines[i], 10.0f, start_y + i * lh, col, w, h);
+      }
+    }
+
     // Draw test-image.png in the bottom right corner
     if (img_tex && img_w > 0) {
       float x0 = w - img_w, y0 = h - img_h;
