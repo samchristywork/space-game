@@ -1550,7 +1550,8 @@ int main(int argc, char **argv) {
     // Draw all planets and orbit lines
     glUniform1i(use_vc_loc, 1);
     glUniform1i(is_star_loc, 0);
-    for (auto &pl : g_planets) {
+    for (int pi = 0; pi < (int)g_planets.size(); pi++) {
+      Planet &pl = g_planets[pi];
       pl.orbit_angle +=
           g_paused ? 0.0f
                    : dt * g_timescale * (2.0f * (float)M_PI / pl.orbit_period);
@@ -1566,11 +1567,18 @@ int main(int argc, char **argv) {
       glBindVertexArray(pl.vao);
       glDrawElements(GL_TRIANGLES, pl.idx_count, GL_UNSIGNED_INT, nullptr);
 
+      bool orbit_hovered = (g_hover_type == HOVER_PLANET && g_hover_idx == pi);
       glm::mat4 orbit_mvp = mvp * glm::translate(glm::mat4(1.0f), pl.star_pos);
       glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(orbit_mvp));
       glBindVertexArray(pl.orbit_vao);
-      glLineWidth(1.0f);
+      glLineWidth(orbit_hovered ? 2.0f : 1.0f);
+      if (orbit_hovered) {
+        glUniform1i(use_vc_loc, 0);
+        glUniform3f(color_loc, 0.45f, 0.45f, 0.75f);
+      }
       glDrawArrays(GL_LINE_LOOP, 0, ORBIT_SEGS);
+      if (orbit_hovered)
+        glUniform1i(use_vc_loc, 1);
     }
 
     // Draw orbit target indicator
