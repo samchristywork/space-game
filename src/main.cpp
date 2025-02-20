@@ -1775,8 +1775,22 @@ int main(int argc, char **argv) {
 
     text_draw(FORMATION_NAMES[g_formation], 10.0f, h - 10.0f - g_font_size,
               {0.8f, 0.8f, 0.2f}, w, h);
+
+    {
+      int sel_count = 0;
+      for (const auto &sh : g_ships)
+        if (sh.selected)
+          sel_count++;
+      if (sel_count > 0) {
+        char sel_buf[32];
+        snprintf(sel_buf, sizeof(sel_buf), "%d selected", sel_count);
+        text_draw(sel_buf, 10.0f, h - 10.0f - (g_font_size + 4) * 2,
+                  {0.7f, 1.0f, 0.7f}, w, h);
+      }
+    }
+
     if (g_follow_mode)
-      text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 2,
+      text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 3,
                 {0.3f, 0.9f, 1.0f}, w, h);
 
     // Hover info panel — left side, vertically centered
