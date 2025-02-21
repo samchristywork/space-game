@@ -413,6 +413,7 @@ static double g_drag_cur_x = 0.0, g_drag_cur_y = 0.0;
 
 static bool g_uncapped = false;
 static bool g_paused = false;
+static constexpr float SHIP_SPEED = 0.4f;
 
 enum HoverType {
   HOVER_NONE,
@@ -1168,7 +1169,6 @@ int main(int argc, char **argv) {
     if (!g_paused) {
       // Move ships toward their assigned targets (via waypoints if routed
       // through wormhole)
-      static constexpr float SHIP_SPEED = 0.4f;
       for (auto &sh : g_ships) {
         if (!sh.has_move_target)
           continue;
@@ -1871,6 +1871,67 @@ int main(int argc, char **argv) {
       for (int i = 0; i < nlines; i++) {
         glm::vec3 col = (i == 0) ? header_col : body_col;
         text_draw(lines[i], 10.0f, start_y + i * lh, col, w, h);
+      }
+    }
+
+    // Move order ETA — projected next to the 3D cursor
+    {
+      // Compute total remaining path length for each selected ship with a
+      // target
+      float total_dist = 0.0f;
+      float max_dist = 0.0f;
+      int count = 0;
+      for (const auto &sh : g_ships) {
+        if (!sh.selected || !sh.has_move_target)
+          continue;
+        float d = 0.0f;
+        glm::vec3 prev = sh.pos;
+        for (const auto &wp : sh.waypoints) {
+          d += glm::distance(prev, wp);
+          prev = wp;
+        }
+        d += glm::distance(prev, sh.move_target);
+        prev = sh.move_target;
+        for (const auto &pt : sh.pending_targets) {
+          d += glm::distance(prev, pt);
+          prev = pt;
+        }
+        total_dist += d;
+        if (d > max_dist)
+          max_dist = d;
+        count++;
+      }
+
+      if (count > 0) {
+        float avg_dist = total_dist / count;
+        float eff_speed = SHIP_SPEED * (g_paused ? 0.0f : g_timescale);
+        float avg_eta = (eff_speed > 0.0f) ? avg_dist / eff_speed : 0.0f;
+        float max_eta = (eff_speed > 0.0f) ? max_dist / eff_speed : 0.0f;
+
+        // Format ETA as Xm Ys or Xs
+        auto fmt_time = [](char *buf, int sz, float secs) {
+          if (secs >= 60.0f)
+            snprintf(buf, sz, "%dm %ds", (int)secs / 60, (int)secs % 60);
+          else
+            snprintf(buf, sz, "%.1fs", secs);
+        };
+
+        char dist_buf[48], eta_buf[32], max_buf[32];
+        snprintf(dist_buf, sizeof(dist_buf), "dist %.2f", avg_dist);
+        fmt_time(eta_buf, sizeof(eta_buf), avg_eta);
+        fmt_time(max_buf, sizeof(max_buf), max_eta);
+
+        char line1[64], line2[64];
+        snprintf(line1, sizeof(line1), "dist  avg %.2f  max %.2f", avg_dist,
+                 max_dist);
+        snprintf(line2, sizeof(line2), "ETA   avg %s  max %s", eta_buf,
+                 max_buf);
+
+        float lh2 = g_font_size + 4.0f;
+        float cx = w - fmaxf(text_width(line1), text_width(line2)) - 10.0f;
+        float cy = h * 0.5f - lh2;
+        text_draw(line1, cx, cy, {0.8f, 0.9f, 1.0f}, w, h);
+        text_draw(line2, cx, cy + lh2, {0.8f, 0.9f, 1.0f}, w, h);
       }
     }
 
