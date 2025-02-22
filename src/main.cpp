@@ -1921,7 +1921,7 @@ int main(int argc, char **argv) {
         fmt_time(eta_buf, sizeof(eta_buf), avg_eta);
         fmt_time(max_buf, sizeof(max_buf), max_eta);
 
-        char line1[64], line2[64];
+        char line1[64], line2[96];
         snprintf(line1, sizeof(line1), "dist  avg %.2f  max %.2f", avg_dist,
                  max_dist);
         snprintf(line2, sizeof(line2), "ETA   avg %s  max %s", eta_buf,
