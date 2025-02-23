@@ -306,6 +306,9 @@ struct Spaceship {
   std::vector<glm::vec3>
       pending_targets;  // user-queued destinations after move_target
   int formation_id = 0; // shared among ships in the same move order (0 = none)
+  bool on_patrol = false;
+  std::vector<glm::vec3> patrol_points; // cycled indefinitely when on_patrol
+  int patrol_idx = 0;
   GLuint vao, vbo;
 };
 static std::vector<Spaceship> g_ships;
@@ -426,6 +429,10 @@ static HoverType g_hover_type = HOVER_NONE;
 static int g_hover_idx = -1;
 static int g_hover_wh_side = 0; // 0 = endpoint a, 1 = endpoint b
 
+static std::vector<glm::vec3> compute_route(glm::vec3 from, glm::vec3 to);
+static std::vector<glm::vec3>
+compute_formation_targets(const std::vector<Spaceship *> &sel);
+
 static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   if (action != GLFW_PRESS)
     return;
@@ -516,6 +523,26 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   case GLFW_KEY_P:
     g_paused = !g_paused;
     break;
+  case GLFW_KEY_O: {
+    std::vector<Spaceship *> sel;
+    for (auto &sh : g_ships)
+      if (sh.selected)
+        sel.push_back(&sh);
+    if (sel.empty())
+      break;
+    auto targets = compute_formation_targets(sel);
+    for (int i = 0; i < (int)sel.size(); i++) {
+      Spaceship *sh = sel[i];
+      sh->on_patrol = true;
+      sh->patrol_points = std::vector<glm::vec3>{sh->pos, targets[i]};
+      sh->patrol_idx = 0;
+      sh->pending_targets.clear();
+      sh->has_move_target = true;
+      sh->move_target = targets[i];
+      sh->waypoints = compute_route(sh->pos, targets[i]);
+    }
+    break;
+  }
   case GLFW_KEY_COMMA:
     g_timescale = fmaxf(g_timescale / 10.0f, 1e-4f);
     break;
@@ -559,6 +586,82 @@ static std::vector<glm::vec3> compute_route(glm::vec3 from, glm::vec3 to) {
   return route;
 }
 
+// Returns one world-space formation target per ship in sel, around cam.target.
+static std::vector<glm::vec3>
+compute_formation_targets(const std::vector<Spaceship *> &sel) {
+  float cx = cosf(cam.pitch) * sinf(cam.yaw);
+  float cy = sinf(cam.pitch);
+  float cz = cosf(cam.pitch) * cosf(cam.yaw);
+  glm::vec3 fwd = glm::normalize(glm::vec3(cx, cy, cz));
+  glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+  glm::vec3 up = glm::cross(right, fwd);
+  float spacing = cam.dist * 0.02f;
+  int n = (int)sel.size();
+  std::vector<glm::vec3> targets(n);
+
+  if (g_formation == FORMATION_HEX) {
+    int idx = 0;
+    for (int ring = 0; idx < n; ring++) {
+      int slots = (ring == 0) ? 1 : ring * 6;
+      for (int i = 0; i < slots && idx < n; i++, idx++) {
+        float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
+        targets[idx] = cam.target + (right * cosf(angle) + up * sinf(angle)) *
+                                        (ring * spacing);
+      }
+    }
+  } else if (g_formation == FORMATION_LINE) {
+    float total = (n - 1) * spacing;
+    for (int i = 0; i < n; i++)
+      targets[i] = cam.target + right * ((i * spacing) - total * 0.5f);
+  } else if (g_formation == FORMATION_WEDGE) {
+    targets[0] = cam.target;
+    for (int i = 1; i < n; i++) {
+      int pair = (i + 1) / 2;
+      float side = (i % 2 == 1) ? 1.0f : -1.0f;
+      targets[i] =
+          cam.target + right * (side * pair * spacing) - up * (pair * spacing);
+    }
+  } else if (g_formation == FORMATION_WALL) {
+    int cols = (int)ceilf(sqrtf((float)n));
+    int rows = (n + cols - 1) / cols;
+    for (int i = 0; i < n; i++)
+      targets[i] = cam.target +
+                   right * ((i % cols - (cols - 1) * 0.5f) * spacing) +
+                   up * ((i / cols - (rows - 1) * 0.5f) * spacing);
+  } else if (g_formation == FORMATION_BOX) {
+    int side = (int)ceilf(cbrtf((float)n));
+    for (int i = 0; i < n; i++)
+      targets[i] = cam.target +
+                   right * ((i % side - (side - 1) * 0.5f) * spacing) +
+                   up * (((i / side) % side - (side - 1) * 0.5f) * spacing) +
+                   fwd * ((i / (side * side) - (side - 1) * 0.5f) * spacing);
+  } else if (g_formation == FORMATION_SPHERE) {
+    float radius = spacing * sqrtf((float)n / (float)M_PI);
+    float golden = (float)M_PI * (3.0f - sqrtf(5.0f));
+    for (int i = 0; i < n; i++) {
+      float y2 = (n > 1) ? (1.0f - 2.0f * i / (n - 1)) : 0.0f;
+      float r2 = sqrtf(fmaxf(0.0f, 1.0f - y2 * y2));
+      float theta = golden * i;
+      targets[i] = cam.target + (right * (cosf(theta) * r2) + up * y2 +
+                                 fwd * (sinf(theta) * r2)) *
+                                    radius;
+    }
+  } else { // FORMATION_RANDOM
+    float radius = spacing * sqrtf((float)n / (float)M_PI);
+    for (int i = 0; i < n; i++) {
+      glm::vec3 offset;
+      do {
+        float rx = (rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        float ry = (rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        float rz = (rand() / (float)RAND_MAX) * 2.0f - 1.0f;
+        offset = glm::vec3(rx, ry, rz) * radius;
+      } while (glm::length(offset) > radius);
+      targets[i] = cam.target + offset;
+    }
+  }
+  return targets;
+}
+
 static void mouse_button_cb(GLFWwindow *win, int button, int action, int mods) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
     bool shift = (mods & GLFW_MOD_SHIFT) != 0;
@@ -581,86 +684,15 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int mods) {
           sh->pending_targets.push_back(target);
         } else {
           sh->pending_targets.clear();
+          sh->on_patrol = false;
           sh->has_move_target = true;
           sh->move_target = target;
           sh->waypoints = compute_route(sh->pos, target);
         }
       };
-      // Compute camera right/up basis for all formation types
-      float cx = cosf(cam.pitch) * sinf(cam.yaw);
-      float cy = sinf(cam.pitch);
-      float cz = cosf(cam.pitch) * cosf(cam.yaw);
-      glm::vec3 fwd = glm::normalize(glm::vec3(cx, cy, cz));
-      glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
-      glm::vec3 up = glm::cross(right, fwd);
-      float spacing = cam.dist * 0.02f;
-      int n = (int)sel.size();
-
-      if (g_formation == FORMATION_HEX) {
-        int idx = 0;
-        for (int ring = 0; idx < n; ring++) {
-          int slots = (ring == 0) ? 1 : ring * 6;
-          for (int i = 0; i < slots && idx < n; i++, idx++) {
-            float angle = (ring == 0) ? 0.0f : 2.0f * (float)M_PI * i / slots;
-            glm::vec3 offset =
-                (right * cosf(angle) + up * sinf(angle)) * (ring * spacing);
-            assign(sel[idx], cam.target + offset);
-          }
-        }
-      } else if (g_formation == FORMATION_LINE) {
-        float total = (n - 1) * spacing;
-        for (int i = 0; i < n; i++)
-          assign(sel[i], cam.target + right * ((i * spacing) - total * 0.5f));
-      } else if (g_formation == FORMATION_WEDGE) {
-        assign(sel[0], cam.target);
-        for (int i = 1; i < n; i++) {
-          int pair = (i + 1) / 2;
-          float side = (i % 2 == 1) ? 1.0f : -1.0f;
-          assign(sel[i], cam.target + right * (side * pair * spacing) -
-                             up * (pair * spacing));
-        }
-      } else if (g_formation == FORMATION_WALL) {
-        int cols = (int)ceilf(sqrtf((float)n));
-        int rows = (n + cols - 1) / cols;
-        for (int i = 0; i < n; i++) {
-          glm::vec3 offset =
-              right * ((i % cols - (cols - 1) * 0.5f) * spacing) +
-              up * ((i / cols - (rows - 1) * 0.5f) * spacing);
-          assign(sel[i], cam.target + offset);
-        }
-      } else if (g_formation == FORMATION_BOX) {
-        int side = (int)ceilf(cbrtf((float)n));
-        for (int i = 0; i < n; i++) {
-          glm::vec3 offset =
-              right * ((i % side - (side - 1) * 0.5f) * spacing) +
-              up * (((i / side) % side - (side - 1) * 0.5f) * spacing) +
-              fwd * ((i / (side * side) - (side - 1) * 0.5f) * spacing);
-          assign(sel[i], cam.target + offset);
-        }
-      } else if (g_formation == FORMATION_SPHERE) {
-        float radius = spacing * sqrtf((float)n / (float)M_PI);
-        float golden = (float)M_PI * (3.0f - sqrtf(5.0f));
-        for (int i = 0; i < n; i++) {
-          float y = (n > 1) ? (1.0f - 2.0f * i / (n - 1)) : 0.0f;
-          float r = sqrtf(fmaxf(0.0f, 1.0f - y * y));
-          float theta = golden * i;
-          glm::vec3 dir =
-              right * (cosf(theta) * r) + up * y + fwd * (sinf(theta) * r);
-          assign(sel[i], cam.target + dir * radius);
-        }
-      } else if (g_formation == FORMATION_RANDOM) {
-        float radius = spacing * sqrtf((float)n / (float)M_PI);
-        for (int i = 0; i < n; i++) {
-          glm::vec3 offset;
-          do {
-            float rx = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
-            float ry = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
-            float rz = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f);
-            offset = glm::vec3(rx, ry, rz) * radius;
-          } while (glm::length(offset) > radius);
-          assign(sel[i], cam.target + offset);
-        }
-      }
+      auto targets = compute_formation_targets(sel);
+      for (int i = 0; i < (int)sel.size(); i++)
+        assign(sel[i], targets[i]);
     }
   }
   if (button == GLFW_MOUSE_BUTTON_RIGHT)
@@ -1198,6 +1230,11 @@ int main(int argc, char **argv) {
             sh.pending_targets.erase(sh.pending_targets.begin());
             sh.move_target = next;
             sh.waypoints = compute_route(sh.pos, next);
+          } else if (sh.on_patrol && sh.patrol_points.size() >= 2) {
+            // Advance to next patrol point, wrapping around
+            sh.patrol_idx = (sh.patrol_idx + 1) % (int)sh.patrol_points.size();
+            sh.move_target = sh.patrol_points[sh.patrol_idx];
+            sh.waypoints = compute_route(sh.pos, sh.move_target);
           } else {
             sh.has_move_target = false;
           }
@@ -1789,8 +1826,19 @@ int main(int argc, char **argv) {
       }
     }
 
+    {
+      bool any_patrol = false;
+      for (const auto &sh : g_ships)
+        if (sh.selected && sh.on_patrol) {
+          any_patrol = true;
+          break;
+        }
+      if (any_patrol)
+        text_draw("PATROL", 10.0f, h - 10.0f - (g_font_size + 4) * 3,
+                  {0.4f, 1.0f, 0.5f}, w, h);
+    }
     if (g_follow_mode)
-      text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 3,
+      text_draw("FOLLOW", 10.0f, h - 10.0f - (g_font_size + 4) * 4,
                 {0.3f, 0.9f, 1.0f}, w, h);
 
     // Hover info panel — left side, vertically centered
