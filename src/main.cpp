@@ -523,6 +523,24 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
   case GLFW_KEY_P:
     g_paused = !g_paused;
     break;
+  case GLFW_KEY_N: {
+    // Select the ship nearest to the 3D cursor
+    float best = 1e9f;
+    int best_i = -1;
+    for (int i = 0; i < (int)g_ships.size(); i++) {
+      float d = glm::distance(g_ships[i].pos, cam.target);
+      if (d < best) {
+        best = d;
+        best_i = i;
+      }
+    }
+    if (best_i >= 0) {
+      for (auto &sh : g_ships)
+        sh.selected = false;
+      g_ships[best_i].selected = true;
+    }
+    break;
+  }
   case GLFW_KEY_O: {
     std::vector<Spaceship *> sel;
     for (auto &sh : g_ships)
