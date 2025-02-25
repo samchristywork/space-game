@@ -396,7 +396,10 @@ static const char *FORMATION_NAMES[] = {"Hex", "Line",   "Wedge", "Wall",
 
 static float g_timescale = 1.0f;
 static bool g_pick_pending = false;
+static bool g_dbl_click_pending = false;
 static double g_pick_x = 0.0, g_pick_y = 0.0;
+static double g_last_pick_time = -1.0;
+static double g_last_pick_x = 0.0, g_last_pick_y = 0.0;
 static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
 static bool mmb_down = false;
@@ -729,6 +732,14 @@ static void mouse_button_cb(GLFWwindow *win, int button, int action, int mods) {
         g_pick_pending = true;
         g_pick_x = g_drag_start_x;
         g_pick_y = g_drag_start_y;
+        double now = glfwGetTime();
+        double ddx = g_drag_start_x - g_last_pick_x;
+        double ddy = g_drag_start_y - g_last_pick_y;
+        if (now - g_last_pick_time < 0.35 && ddx * ddx + ddy * ddy < 100.0)
+          g_dbl_click_pending = true;
+        g_last_pick_time = now;
+        g_last_pick_x = g_drag_start_x;
+        g_last_pick_y = g_drag_start_y;
       } else {
         g_drag_select_pending = true;
       }
@@ -1362,6 +1373,8 @@ int main(int argc, char **argv) {
     // Picking: find the star or planet closest to a left-click
     if (g_pick_pending) {
       g_pick_pending = false;
+      bool dbl = g_dbl_click_pending;
+      g_dbl_click_pending = false;
       static const char *spectral[] = {
           "G (yellow)",       "B (blue-white)",   "M (red dwarf)",
           "A (white)",        "K (orange)",       "O (hot blue)",
@@ -1421,6 +1434,8 @@ int main(int argc, char **argv) {
 
       if (best_star >= 0) {
         const LocalStar &s = LOCAL_STARS[best_star];
+        if (dbl)
+          cam.target = s.pos;
         int n_planets = 0;
         for (const auto &pl : g_planets)
           if (pl.star_pos == s.pos)
@@ -1433,6 +1448,8 @@ int main(int argc, char **argv) {
         printf("  Planets:  %d\n", n_planets);
         fflush(stdout);
       } else if (best_ship >= 0) {
+        if (dbl)
+          cam.target = g_ships[best_ship].pos;
         int fid = g_ships[best_ship].formation_id;
         for (auto &sh : g_ships)
           sh.selected = (fid != 0 && sh.formation_id == fid);
@@ -1445,6 +1462,13 @@ int main(int argc, char **argv) {
         fflush(stdout);
       } else if (best_planet >= 0) {
         const Planet &pl = g_planets[best_planet];
+        if (dbl) {
+          cam.target =
+              pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
+                                      pl.orbit_radius * sinf(pl.orbit_tilt) *
+                                          sinf(pl.orbit_angle),
+                                      pl.orbit_radius * sinf(pl.orbit_angle));
+        }
         int parent = -1;
         for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
              i++)
