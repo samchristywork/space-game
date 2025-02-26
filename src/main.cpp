@@ -1395,7 +1395,7 @@ int main(int argc, char **argv) {
 
       float best_d = 20.0f;
       int best_star = -1, best_planet = -1;
-      int best_ship = -1;
+      int best_ship = -1, best_wormhole = -1, best_wh_side = 0;
 
       for (int i = 0; i < (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
            i++) {
@@ -1429,6 +1429,27 @@ int main(int argc, char **argv) {
           best_ship = i;
           best_star = -1;
           best_planet = -1;
+          best_wormhole = -1;
+        }
+      }
+      for (int i = 0; i < NUM_WORMHOLE_PAIRS; i++) {
+        float da = screen_dist(WORMHOLE_PAIRS[i].a);
+        float db = screen_dist(WORMHOLE_PAIRS[i].b);
+        if (da < best_d) {
+          best_d = da;
+          best_wormhole = i;
+          best_wh_side = 0;
+          best_star = -1;
+          best_planet = -1;
+          best_ship = -1;
+        }
+        if (db < best_d) {
+          best_d = db;
+          best_wormhole = i;
+          best_wh_side = 1;
+          best_star = -1;
+          best_planet = -1;
+          best_ship = -1;
         }
       }
 
@@ -1491,6 +1512,12 @@ int main(int argc, char **argv) {
         printf("  Orbit period: %.2f s\n", pl.orbit_period);
         printf("  Orbit tilt:   %.1f deg\n", glm::degrees(pl.orbit_tilt));
         fflush(stdout);
+      } else if (best_wormhole >= 0) {
+        const glm::vec3 &pos = best_wh_side == 0
+                                   ? WORMHOLE_PAIRS[best_wormhole].a
+                                   : WORMHOLE_PAIRS[best_wormhole].b;
+        if (dbl)
+          cam.target = pos;
       } else {
         // Clicked empty space — deselect all
         for (auto &sh : g_ships)
