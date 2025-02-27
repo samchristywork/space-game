@@ -402,6 +402,7 @@ static double g_last_pick_time = -1.0;
 static double g_last_pick_x = 0.0, g_last_pick_y = 0.0;
 static float target_yaw = cam.yaw;
 static float target_pitch = cam.pitch;
+static glm::vec3 g_cursor_dest{0.0f, 0.0f, 0.0f};
 static bool mmb_down = false;
 static bool g_rmb_down = false;
 static std::vector<int> g_groups[10];
@@ -476,7 +477,7 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
         count++;
       }
     if (count > 0)
-      cam.target = sum / (float)count;
+      g_cursor_dest = sum / (float)count;
     break;
   }
   case GLFW_KEY_F:
@@ -510,7 +511,7 @@ static void key_cb(GLFWwindow *, int key, int, int action, int mods) {
         for (int i : g_groups[g])
           sum += g_ships[i].pos;
         if (!g_groups[g].empty())
-          cam.target = sum / (float)g_groups[g].size();
+          g_cursor_dest = sum / (float)g_groups[g].size();
         g_last_group_key = -1;
       } else {
         for (auto &sh : g_ships)
@@ -804,6 +805,7 @@ static void cursor_pos_cb(GLFWwindow *win, double mx, double my) {
     float pan_speed = cam.dist * 0.001f;
     cam.target += right * (float)dx * pan_speed;
     cam.target += up * (float)dy * pan_speed;
+    g_cursor_dest = cam.target;
   } else {
     // Orbit
     const float sensitivity = 0.005f;
@@ -1283,7 +1285,7 @@ int main(int argc, char **argv) {
           count++;
         }
       if (count > 0)
-        cam.target = sum / (float)count;
+        g_cursor_dest = sum / (float)count;
     }
 
     // Smoothly interpolate camera toward target orientation
@@ -1293,6 +1295,9 @@ int main(int argc, char **argv) {
     float t = 1.0f - expf(-speed * dt);
     cam.yaw += dyaw * t;
     cam.pitch += (target_pitch - cam.pitch) * t;
+
+    // Smoothly move 3D cursor toward its destination
+    cam.target += (g_cursor_dest - cam.target) * t;
 
     int w, h;
     glfwGetFramebufferSize(win, &w, &h);
@@ -1456,7 +1461,7 @@ int main(int argc, char **argv) {
       if (best_star >= 0) {
         const LocalStar &s = LOCAL_STARS[best_star];
         if (dbl)
-          cam.target = s.pos;
+          g_cursor_dest = s.pos;
         int n_planets = 0;
         for (const auto &pl : g_planets)
           if (pl.star_pos == s.pos)
@@ -1470,7 +1475,7 @@ int main(int argc, char **argv) {
         fflush(stdout);
       } else if (best_ship >= 0) {
         if (dbl)
-          cam.target = g_ships[best_ship].pos;
+          g_cursor_dest = g_ships[best_ship].pos;
         int fid = g_ships[best_ship].formation_id;
         for (auto &sh : g_ships)
           sh.selected = (fid != 0 && sh.formation_id == fid);
@@ -1484,7 +1489,7 @@ int main(int argc, char **argv) {
       } else if (best_planet >= 0) {
         const Planet &pl = g_planets[best_planet];
         if (dbl) {
-          cam.target =
+          g_cursor_dest =
               pl.star_pos + glm::vec3(pl.orbit_radius * cosf(pl.orbit_angle),
                                       pl.orbit_radius * sinf(pl.orbit_tilt) *
                                           sinf(pl.orbit_angle),
@@ -1517,7 +1522,7 @@ int main(int argc, char **argv) {
                                    ? WORMHOLE_PAIRS[best_wormhole].a
                                    : WORMHOLE_PAIRS[best_wormhole].b;
         if (dbl)
-          cam.target = pos;
+          g_cursor_dest = pos;
       } else {
         // Clicked empty space — deselect all
         for (auto &sh : g_ships)
