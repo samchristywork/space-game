@@ -295,10 +295,12 @@ struct Planet {
 static std::vector<Planet> g_planets;
 
 enum ShipShape { SHIP_TRIANGLE, SHIP_SQUARE };
+enum Faction { FACTION_PLAYER, FACTION_NEUTRAL };
 
 struct Spaceship {
   glm::vec3 pos;
   ShipShape shape;
+  Faction faction = FACTION_PLAYER;
   bool selected = false;
   bool has_move_target = false;
   glm::vec3 move_target{0.0f, 0.0f, 0.0f};
@@ -1047,10 +1049,12 @@ int main(int argc, char **argv) {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  auto make_ship = [&](glm::vec3 pos, ShipShape shape) {
+  auto make_ship = [&](glm::vec3 pos, ShipShape shape,
+                       Faction faction = FACTION_PLAYER) {
     Spaceship s;
     s.pos = pos;
     s.shape = shape;
+    s.faction = faction;
     glGenVertexArrays(1, &s.vao);
     glGenBuffers(1, &s.vbo);
     glBindVertexArray(s.vao);
@@ -1085,6 +1089,19 @@ int main(int argc, char **argv) {
     float y = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
     float z = ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
     make_ship({x, y, z}, SHIP_SQUARE);
+  }
+
+  // Neutral ships near the K orange giant star at (1, 5, 4)
+  glm::vec3 neutral_base{1.0f, 5.0f, 4.0f};
+  srand(777);
+  for (int i = 0; i < 20; i++) {
+    float x =
+        neutral_base.x + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
+    float y =
+        neutral_base.y + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
+    float z =
+        neutral_base.z + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
+    make_ship({x, y, z}, SHIP_SQUARE, FACTION_NEUTRAL);
   }
 
   // Stars: random points on a unit sphere, rendered with rotation-only view
@@ -1714,14 +1731,25 @@ int main(int argc, char **argv) {
       for (auto &ship : g_ships) {
         glBindVertexArray(ship.vao);
         glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
-        // Selected: yellow fill / dark-yellow outline. Unselected: cyan /
-        // dark-teal.
-        float fr = ship.selected ? 1.00f : 0.20f;
-        float fg = ship.selected ? 1.00f : 1.00f;
-        float fb = ship.selected ? 0.30f : 0.90f;
-        float or_ = ship.selected ? 0.50f : 0.05f;
-        float og = ship.selected ? 0.50f : 0.45f;
-        float ob = ship.selected ? 0.10f : 0.40f;
+        // Fill and outline colors by faction + selection state.
+        // Player:  unselected = cyan,  selected = yellow
+        // Neutral: unselected = grey,  selected = white
+        float fr, fg, fb, or_, og, ob;
+        if (ship.faction == FACTION_NEUTRAL) {
+          fr = ship.selected ? 1.00f : 0.60f;
+          fg = ship.selected ? 1.00f : 0.60f;
+          fb = ship.selected ? 1.00f : 0.60f;
+          or_ = ship.selected ? 0.55f : 0.25f;
+          og = ship.selected ? 0.55f : 0.25f;
+          ob = ship.selected ? 0.55f : 0.25f;
+        } else { // FACTION_PLAYER
+          fr = ship.selected ? 1.00f : 0.20f;
+          fg = ship.selected ? 1.00f : 1.00f;
+          fb = ship.selected ? 0.30f : 0.90f;
+          or_ = ship.selected ? 0.50f : 0.05f;
+          og = ship.selected ? 0.50f : 0.45f;
+          ob = ship.selected ? 0.10f : 0.40f;
+        }
         if (ship.shape == SHIP_TRIANGLE) {
           glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
           glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
@@ -1960,6 +1988,8 @@ int main(int argc, char **argv) {
       } else if (g_hover_type == HOVER_SHIP) {
         const Spaceship &sh = g_ships[g_hover_idx];
         snprintf(lines[nlines++], 80, "Ship %d", g_hover_idx);
+        snprintf(lines[nlines++], 80, "Faction:  %s",
+                 sh.faction == FACTION_NEUTRAL ? "Neutral" : "Player");
         snprintf(lines[nlines++], 80, "Pos:      %.2f  %.2f  %.2f", sh.pos.x,
                  sh.pos.y, sh.pos.z);
         snprintf(lines[nlines++], 80, "Selected: %s",
