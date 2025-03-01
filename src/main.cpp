@@ -1731,25 +1731,17 @@ int main(int argc, char **argv) {
       for (auto &ship : g_ships) {
         glBindVertexArray(ship.vao);
         glBindBuffer(GL_ARRAY_BUFFER, ship.vbo);
-        // Fill and outline colors by faction + selection state.
-        // Player:  unselected = cyan,  selected = yellow
-        // Neutral: unselected = grey,  selected = white
-        float fr, fg, fb, or_, og, ob;
-        if (ship.faction == FACTION_NEUTRAL) {
-          fr = ship.selected ? 1.00f : 0.60f;
-          fg = ship.selected ? 1.00f : 0.60f;
-          fb = ship.selected ? 1.00f : 0.60f;
-          or_ = ship.selected ? 0.55f : 0.25f;
-          og = ship.selected ? 0.55f : 0.25f;
-          ob = ship.selected ? 0.55f : 0.25f;
-        } else { // FACTION_PLAYER
-          fr = ship.selected ? 1.00f : 0.20f;
-          fg = ship.selected ? 1.00f : 1.00f;
-          fb = ship.selected ? 0.30f : 0.90f;
-          or_ = ship.selected ? 0.50f : 0.05f;
-          og = ship.selected ? 0.50f : 0.45f;
-          ob = ship.selected ? 0.10f : 0.40f;
-        }
+        // Derive fill and outline from faction base color.
+        // Unselected fill = base, selected fill = base mixed toward white.
+        // Outline = darkened base (selected slightly less dark).
+        glm::vec3 base = (ship.faction == FACTION_NEUTRAL)
+                             ? glm::vec3(0.55f, 0.55f, 0.55f)
+                             : glm::vec3(0.20f, 0.55f, 1.00f);
+        glm::vec3 fill =
+            ship.selected ? glm::mix(base, glm::vec3(1.0f), 0.75f) : base;
+        glm::vec3 outline = ship.selected ? base * 0.9f : base * 0.35f;
+        float fr = fill.r, fg = fill.g, fb = fill.b;
+        float or_ = outline.r, og = outline.g, ob = outline.b;
         if (ship.shape == SHIP_TRIANGLE) {
           glm::vec3 v0 = ship.pos + s * (cam_up * 0.6f);
           glm::vec3 v1 = ship.pos + s * (-cam_right * 0.5f - cam_up * 0.3f);
