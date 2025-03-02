@@ -296,11 +296,13 @@ static std::vector<Planet> g_planets;
 
 enum ShipShape { SHIP_TRIANGLE, SHIP_SQUARE };
 enum Faction { FACTION_PLAYER, FACTION_NEUTRAL };
+enum Behavior { BEHAVIOR_NONE, BEHAVIOR_WANDER };
 
 struct Spaceship {
   glm::vec3 pos;
   ShipShape shape;
   Faction faction = FACTION_PLAYER;
+  Behavior behavior = BEHAVIOR_NONE;
   bool selected = false;
   bool has_move_target = false;
   glm::vec3 move_target{0.0f, 0.0f, 0.0f};
@@ -1102,6 +1104,7 @@ int main(int argc, char **argv) {
     float z =
         neutral_base.z + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
     make_ship({x, y, z}, SHIP_SQUARE, FACTION_NEUTRAL);
+    g_ships.back().behavior = BEHAVIOR_WANDER;
   }
 
   // Stars: random points on a unit sphere, rendered with rotation-only view
@@ -1289,6 +1292,36 @@ int main(int argc, char **argv) {
         } else {
           sh.pos += (delta / dist) * step;
         }
+      }
+    }
+
+    // Wander behavior: pick a random star when idle
+    if (!g_paused) {
+      static constexpr int NUM_LOCAL_STARS =
+          (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
+      for (auto &sh : g_ships) {
+        if (sh.behavior != BEHAVIOR_WANDER || sh.has_move_target)
+          continue;
+        // Pick a random star, biased away from the one we're already near
+        int best = -1;
+        float best_d = -1.0f;
+        for (int attempt = 0; attempt < 6; attempt++) {
+          int idx = rand() % NUM_LOCAL_STARS;
+          float d = glm::distance(sh.pos, LOCAL_STARS[idx].pos);
+          if (d > best_d) {
+            best_d = d;
+            best = idx;
+          }
+        }
+        // Add a small random offset so ships don't all stack on the star
+        glm::vec3 jitter{
+            ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.15f,
+            ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.15f,
+            ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.15f,
+        };
+        sh.has_move_target = true;
+        sh.move_target = LOCAL_STARS[best].pos + jitter;
+        sh.waypoints = compute_route(sh.pos, sh.move_target);
       }
     }
 
@@ -1982,6 +2015,8 @@ int main(int argc, char **argv) {
         snprintf(lines[nlines++], 80, "Ship %d", g_hover_idx);
         snprintf(lines[nlines++], 80, "Faction:  %s",
                  sh.faction == FACTION_NEUTRAL ? "Neutral" : "Player");
+        if (sh.behavior == BEHAVIOR_WANDER)
+          snprintf(lines[nlines++], 80, "Behavior: Wander");
         snprintf(lines[nlines++], 80, "Pos:      %.2f  %.2f  %.2f", sh.pos.x,
                  sh.pos.y, sh.pos.z);
         snprintf(lines[nlines++], 80, "Selected: %s",
