@@ -1093,16 +1093,15 @@ int main(int argc, char **argv) {
     make_ship({x, y, z}, SHIP_SQUARE);
   }
 
-  // Neutral ships near the K orange giant star at (1, 5, 4)
-  glm::vec3 neutral_base{1.0f, 5.0f, 4.0f};
+  // 200 neutral ships scattered throughout the world, near random stars
+  static constexpr int NUM_LOCAL_STARS_INIT =
+      (int)(sizeof(LOCAL_STARS) / sizeof(LOCAL_STARS[0]));
   srand(777);
-  for (int i = 0; i < 20; i++) {
-    float x =
-        neutral_base.x + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
-    float y =
-        neutral_base.y + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
-    float z =
-        neutral_base.z + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.2f;
+  for (int i = 0; i < 200; i++) {
+    const glm::vec3 &base = LOCAL_STARS[rand() % NUM_LOCAL_STARS_INIT].pos;
+    float x = base.x + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
+    float y = base.y + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
+    float z = base.z + ((rand() / (float)RAND_MAX) * 2.0f - 1.0f) * 0.3f;
     make_ship({x, y, z}, SHIP_SQUARE, FACTION_NEUTRAL);
     g_ships.back().behavior = BEHAVIOR_WANDER;
   }
